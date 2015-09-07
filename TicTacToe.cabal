@@ -23,6 +23,7 @@ executable tic-tac-toe
                      , containers
                      , text
                      , scotty
+                     , warp
   default-language:    Haskell2010
 
 test-suite TicTacToe-test

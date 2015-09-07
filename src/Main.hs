@@ -9,7 +9,12 @@ import Control.Monad
 
 import Data.Monoid (mconcat)
 
-main = scotty 3000 $ do
+import qualified Network.Wai.Handler.Warp as W
+
+opts :: Options
+opts = Options 1 (W.setHost "127.0.0.1" W.defaultSettings)
+
+main = scottyOpts opts $ do
   get "/test/:id" $ do
     id <- param "id"
     unless (id >= 1 && id <= taskQuantity) next 
