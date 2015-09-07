@@ -17,7 +17,7 @@ testingModule id = renderTask $ lookupTask id
 renderTask :: Maybe Task -> Text
 renderTask Nothing = ""
 renderTask (Just (action, format, modifier)) =
-    let moduleName = "module TicTacToe." ++ show format ++ "\nwhere\n\n"
+    let moduleName = "module TicTacToe.Messages." ++ show format ++ "\nwhere\n\n"
         dataSignature = "message :: String\n"
         dataFunction = "message = \"dasdasd\""
     in T.pack $ moduleName ++ dataSignature ++ dataFunction ++ "\n"
