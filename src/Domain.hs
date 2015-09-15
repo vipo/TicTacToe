@@ -2,6 +2,8 @@ module Domain
 where
 
 import qualified Data.Map as Map
+import Control.Applicative
+import Test.QuickCheck
 
 data Action = Validate | Defence | Winner
     deriving Show
@@ -14,6 +16,23 @@ data Modifier = AsIs | NoArrays
 
 type Task = (Action, Format, Modifier)
 type TaskId = Int
+
+data Value = X | O
+    deriving Show
+instance Arbitrary Value where
+    arbitrary = elements [X, O]
+
+data Coord = Coord Integer
+    deriving Show
+instance Arbitrary Coord where
+    arbitrary = do
+        v <- choose (0, 1) :: Gen Integer
+        return $ Coord v
+
+data Move = Move Coord Coord Value
+    deriving Show
+instance Arbitrary Move where
+    arbitrary = Move <$> arbitrary <*> arbitrary <*> arbitrary
 
 actions :: [Action]
 actions = [Validate, Defence, Winner]
