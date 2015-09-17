@@ -11,10 +11,19 @@ import Domain
 import Test.QuickCheck
 import Test.QuickCheck.Arbitrary
 
-infinitRandomMoves :: IO [Move]
-infinitRandomMoves =
-    let list = infiniteList :: Gen [Move]
-    in generate list
+orderedValues :: [Value]
+orderedValues = L.cycle [X, O]
+
+randomMoves :: IO [Move]
+randomMoves = do
+    let c = L.map  (\v -> (v `div` 3, v `mod` 3)) [0 .. 8]
+    let coordGen = shuffle c :: Gen [(Integer, Integer)]
+    let countGen = elements [0 .. 9] :: Gen Int
+    count <- generate countGen
+    coords <- generate coordGen
+    let pairs = L.zip orderedValues coords
+    let full = L.map (\(v, c) -> Move (Coord (fst c)) (Coord (snd c)) v) $ pairs 
+    return $ L.take count full
 
 taskQuantity :: Int
 taskQuantity = L.length allTasks

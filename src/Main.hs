@@ -21,5 +21,5 @@ main = scottyOpts opts $ do
   get "/test/:id" $ do
     id <- param "id"
     unless (id >= 1 && id <= taskQuantity) next
-    moves <- liftIO $ infinitRandomMoves
+    moves <- liftIO randomMoves
     text $ testingModule id moves
