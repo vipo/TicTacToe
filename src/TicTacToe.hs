@@ -33,23 +33,26 @@ testingModule id moves = renderTask (lookupTask id) moves
 
 renderTask :: Maybe Task -> [Move] -> Text
 renderTask Nothing _ = ""
-renderTask (Just (action, format, modifier)) m =
+renderTask (Just (action, format, modifier)) moves =
     let moduleName = T.concat ["module TicTacToe.Messages.", T.pack (show format), "\nwhere\n\n"]
-        moves = L.take 9 m
         renderer = case format of
             Scala -> renderScala
             SExpr -> renderSExpr
             MExpr -> renderMExpr
             Json -> renderJson
             Bencode -> renderBencode
-        array = asArray moves
-        dict = asMap moves
         body = case modifier of
-            AsIs -> renderer array
-            NoArrays -> renderer dict
+            AsIs -> renderer $ asArray moves
+            NoArrays -> renderer $ asMap moves
+        dataComment = T.concat ["-- message ", actionText action, "\n"]
         dataSignature = "message :: String\n"
         dataFunction = T.concat ["message = \"", body, "\""]
-    in T.concat [moduleName, dataSignature, dataFunction, "\n"]
+    in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
+
+actionText :: Action -> Text
+actionText Validate = "to validate"
+actionText Defence  = "to react to"
+actionText Winner = "to find out a winner"
 
 letters :: [Text]
 letters = L.map (T.pack . (:[])) ['a' .. 'z']
