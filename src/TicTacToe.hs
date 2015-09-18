@@ -3,12 +3,14 @@
 module TicTacToe
 where
 
+import Control.Lens as Lens
+
 import Data.Text.Lazy as T
-import Data.List as L
+import qualified Data.List as L
 
 import Domain
 
-import Test.QuickCheck
+import Test.QuickCheck as Q
 import Test.QuickCheck.Arbitrary
 
 orderedValues :: [Value]
@@ -18,7 +20,7 @@ randomMoves :: IO [Move]
 randomMoves = do
     let c = L.map  (\v -> (v `div` 3, v `mod` 3)) [0 .. 8]
     let coordGen = shuffle c :: Gen [(Integer, Integer)]
-    let countGen = elements [0 .. 9] :: Gen Int
+    let countGen = Q.elements [0 .. 9] :: Gen Int
     count <- generate countGen
     coords <- generate coordGen
     let pairs = L.zip orderedValues coords
@@ -28,12 +30,12 @@ randomMoves = do
 taskQuantity :: Int
 taskQuantity = L.length allTasks
 
-testingModule :: TaskId -> [Move] -> Text
-testingModule id moves = renderTask (lookupTask id) moves
+testingModule :: TaskId -> [Move] -> [Move] -> Text
+testingModule id = renderTask $ lookupTask id
 
-renderTask :: Maybe Task -> [Move] -> Text
-renderTask Nothing _ = ""
-renderTask (Just (action, format, modifier)) moves =
+renderTask :: Maybe Task -> [Move] -> [Move] -> Text
+renderTask Nothing _ _ = ""
+renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
     let moduleName = T.concat ["module TicTacToe.Messages.", T.pack (show format), "\nwhere\n\n"]
         renderer = case format of
             Scala -> renderScala
@@ -41,18 +43,51 @@ renderTask (Just (action, format, modifier)) moves =
             MExpr -> renderMExpr
             Json -> renderJson
             Bencode -> renderBencode
+        moves = case action of
+            Validate -> (L.take 8 mandatoryMoves) ++ (L.take 1 extraMoves)
+            _ -> case L.span (not . thereIsWinner) (L.inits mandatoryMoves) of
+                (a@(_ : _), []) -> L.head $ L.reverse a
+                (_, h : _) -> h
+                _ -> []
         body = case modifier of
             AsIs -> renderer $ asArray moves
             NoArrays -> renderer $ asMap moves
-        dataComment = T.concat ["-- message ", actionText action, "\n"]
+        dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
         dataFunction = T.concat ["message = \"", body, "\""]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
+
+thereIsWinner :: [Move] -> Bool
+thereIsWinner [] = False
+thereIsWinner _ = False
 
 actionText :: Action -> Text
 actionText Validate = "to validate"
 actionText Defence  = "to react to"
 actionText Winner = "to find out a winner"
+
+printBoard :: [Move] -> Text
+printBoard moves = T.concat [
+    "+---+\n",
+    "|", render initLine (lineSelector 0), "|\n",
+    "|", render initLine (lineSelector 1), "|\n",
+    "|", render initLine (lineSelector 2), "|\n",
+    "+---+"]
+    where
+        initLine = (" ", " ", " ")
+        toLine (a, b, c) = T.concat [a, b, c]
+        lineSelector no = L.filter (\(Move (Coord x) _ _ ) -> x == no) moves
+        update new old =
+            if old /= " " then "#" else
+                case new of
+                    X -> "X"
+                    O -> "O"
+        render acc [] = toLine acc
+        render g ((Move _ (Coord y) v) : t) =
+            case y of
+                0 -> render (Lens.over _1 (update v) g) t
+                1 -> render (Lens.over _2 (update v) g) t
+                2 -> render (Lens.over _3 (update v) g) t
 
 letters :: [Text]
 letters = L.map (T.pack . (:[])) ['a' .. 'z']

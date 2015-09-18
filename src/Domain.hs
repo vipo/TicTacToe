@@ -6,7 +6,7 @@ import Control.Applicative
 import Test.QuickCheck
 
 data Action = Validate | Defence | Winner
-    deriving Show
+    deriving (Show, Eq)
 
 data Format = Bencode | Json | SExpr | MExpr | Scala
     deriving Show

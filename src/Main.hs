@@ -22,4 +22,5 @@ main = scottyOpts opts $ do
     id <- param "id"
     unless (id >= 1 && id <= taskQuantity) next
     moves <- liftIO randomMoves
-    text $ testingModule id moves
+    extra <- liftIO randomMoves
+    text $ testingModule id moves extra
