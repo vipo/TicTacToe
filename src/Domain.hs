@@ -18,15 +18,16 @@ type Task = (Action, Format, Modifier)
 type TaskId = Int
 
 data Value = X | O
-    deriving Show
+    deriving (Show, Eq)
+
 instance Arbitrary Value where
     arbitrary = elements [X, O]
 
-data Coord = Coord Integer
+data Coord = Coord Int
     deriving Show
 instance Arbitrary Coord where
     arbitrary = do
-        v <- choose (0, 1) :: Gen Integer
+        v <- choose (0, 1) :: Gen Int
         return $ Coord v
 
 data Move = Move Coord Coord Value

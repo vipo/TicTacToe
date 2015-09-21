@@ -4,9 +4,11 @@ module TicTacToe
 where
 
 import Control.Lens as Lens
+import Control.Lens.Traversal
 
 import Data.Text.Lazy as T
 import qualified Data.List as L
+import Data.Maybe
 
 import Domain
 
@@ -19,7 +21,7 @@ orderedValues = L.cycle [X, O]
 randomMoves :: IO [Move]
 randomMoves = do
     let c = L.map  (\v -> (v `div` 3, v `mod` 3)) [0 .. 8]
-    let coordGen = shuffle c :: Gen [(Integer, Integer)]
+    let coordGen = shuffle c :: Gen [(Int, Int)]
     let countGen = Q.elements [0 .. 9] :: Gen Int
     count <- generate countGen
     coords <- generate coordGen
@@ -59,7 +61,23 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
 
 thereIsWinner :: [Move] -> Bool
 thereIsWinner [] = False
-thereIsWinner _ = False
+thereIsWinner ms =
+    case movesToVal ms of
+        [a, b, c, _, _, _, _, _, _] | isJust a && a == b && b == c -> True
+        [_, _, _, a, b, c, _, _, _] | isJust a && a == b && b == c -> True
+        [_, _, _, _, _, _, a, b, c] | isJust a && a == b && b == c -> True
+        [a, _, _, b, _, _, c, _, _] | isJust a && a == b && b == c -> True
+        [_, a, _, _, b, _, _, c, _] | isJust a && a == b && b == c -> True
+        [_, _, a, _, _, b, _, _, c] | isJust a && a == b && b == c -> True
+        [a, _, _, _, b, _, _, _, c] | isJust a && a == b && b == c -> True
+        [_, _, a, _, b, _, c, _, _] | isJust a && a == b && b == c -> True
+        _ -> False
+
+movesToVal :: [Move] -> [Maybe Value]
+movesToVal ms = L.foldl toVal initial ms
+    where
+        initial = L.take 9 $ L.repeat Nothing
+        toVal acc (Move (Coord x) (Coord y) v) = acc & element (x * 3 + y) .~ Just v
 
 actionText :: Action -> Text
 actionText Validate = "to validate"
@@ -77,22 +95,19 @@ printBoard moves = T.concat [
         initLine = (" ", " ", " ")
         toLine (a, b, c) = T.concat [a, b, c]
         lineSelector no = L.filter (\(Move (Coord x) _ _ ) -> x == no) moves
-        update new old =
-            if old /= " " then "#" else
-                case new of
-                    X -> "X"
-                    O -> "O"
+        update new old = if old /= " " then "#" else T.pack $ show new
         render acc [] = toLine acc
         render g ((Move _ (Coord y) v) : t) =
             case y of
                 0 -> render (Lens.over _1 (update v) g) t
                 1 -> render (Lens.over _2 (update v) g) t
                 2 -> render (Lens.over _3 (update v) g) t
+                _ -> error "board is not 3x3"
 
 letters :: [Text]
 letters = L.map (T.pack . (:[])) ['a' .. 'z']
 
-data Val = IntVal Integer |
+data Val = IntVal Int |
     StringVal Text |
     DictVal [(Text, Val)] |
     ListOfVals [Val]
