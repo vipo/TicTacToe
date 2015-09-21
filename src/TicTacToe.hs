@@ -86,23 +86,23 @@ actionText Winner = "to find out a winner"
 
 printBoard :: [Move] -> Text
 printBoard moves = T.concat [
-    "+---+\n",
-    "|", render initLine (lineSelector 0), "|\n",
-    "|", render initLine (lineSelector 1), "|\n",
-    "|", render initLine (lineSelector 2), "|\n",
-    "+---+"]
+    "+-+-+-+\n",
+    "|", T.intercalate "|" (L.take 3 result),            "|\n",
+    "+-+-+-+\n",
+    "|", T.intercalate "|" (L.take 3 (L.drop 3 result)), "|\n",
+    "+-+-+-+\n",
+    "|", T.intercalate "|" (L.take 3 (L.drop 6 result)), "|\n",
+    "+-+-+-+"]
     where
-        initLine = (" ", " ", " ")
-        toLine (a, b, c) = T.concat [a, b, c]
-        lineSelector no = L.filter (\(Move (Coord x) _ _ ) -> x == no) moves
-        update new old = if old /= " " then "#" else T.pack $ show new
-        render acc [] = toLine acc
-        render g ((Move _ (Coord y) v) : t) =
-            case y of
-                0 -> render (Lens.over _1 (update v) g) t
-                1 -> render (Lens.over _2 (update v) g) t
-                2 -> render (Lens.over _3 (update v) g) t
-                _ -> error "board is not 3x3"
+        update new old = if old /= empty then "#" else T.pack $ show new
+        vals acc [] = acc
+        vals acc ((Move (Coord x) (Coord y) v) : t) =
+            vals (acc & element coord .~ update v old) t
+            where
+                coord = x * 3 + y
+                old = acc ^?! element coord
+        empty = " "
+        result = vals (L.take 9 (L.repeat empty)) moves
 
 letters :: [Text]
 letters = L.map (T.pack . (:[])) ['a' .. 'z']
