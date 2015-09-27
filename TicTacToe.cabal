@@ -13,13 +13,26 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
 
-executable tic-tac-toe
+library
   hs-source-dirs:      src
+  exposed-modules:     Domain
+                     , Deserialization
+                     , Serialization
+  build-depends:       base
+                     , containers
+                     , QuickCheck
+                     , text
+                     , transformers
+                     , lens
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  default-language:    Haskell2010
+
+executable tic-tac-toe
+  hs-source-dirs:      app
   main-is:             Main.hs
-  other-modules:       Domain
-                     , TicTacToe 
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base >= 4.7 && < 5
+  other-modules:       TicTacToe
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  build-depends:       base
                      , containers
                      , QuickCheck
                      , text
@@ -27,17 +40,22 @@ executable tic-tac-toe
                      , transformers
                      , lens
                      , warp
+                     , TicTacToe
   default-language:    Haskell2010
 
-test-suite TicTacToe-test
+test-suite tic-tac-toe-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
+                     , QuickCheck
+                     , tasty
+                     , tasty-quickcheck
+                     , text
                      , TicTacToe
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -Wall
   default-language:    Haskell2010
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/TicTacToe
+  location: https://github.com/vipo/TicTacToe
