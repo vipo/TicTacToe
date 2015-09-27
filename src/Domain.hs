@@ -6,7 +6,6 @@ where
 import qualified Data.Text.Lazy as T
 import qualified Data.Map as Map
 import qualified Data.List as List
-import Control.Applicative
 import Test.QuickCheck
 
 data Action = Validate | Defence | Winner
@@ -59,7 +58,7 @@ idTaskMap :: Map.Map TaskId Task
 idTaskMap = Map.fromList $ zip [1 .. ] allTasks
 
 lookupTask :: TaskId -> Maybe Task
-lookupTask id = Map.lookup id idTaskMap 
+lookupTask taskId = Map.lookup taskId idTaskMap
 
 data WireVal = IntVal Int |
     StringVal T.Text |

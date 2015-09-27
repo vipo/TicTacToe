@@ -6,20 +6,19 @@ where
 
 import Domain
 
-import Data.Text.Lazy as T
-import qualified Data.List as L
+import qualified Data.Text.Lazy as T
 
-readBencode :: Text -> WireVal
+readBencode :: T.Text -> WireVal
 readBencode _ = undefined
 
-readJson :: Text -> WireVal
+readJson :: T.Text -> WireVal
 readJson _ = undefined
 
-readMExpr :: Text -> WireVal
+readMExpr :: T.Text -> WireVal
 readMExpr _ = undefined
 
-readSExpr :: Text -> WireVal
+readSExpr :: T.Text -> WireVal
 readSExpr _ = undefined
 
-readScala :: Text -> WireVal
+readScala :: T.Text -> WireVal
 readScala _ = undefined
