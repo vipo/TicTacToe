@@ -20,7 +20,9 @@ library
                      , Serialization
   build-depends:       base
                      , containers
+                     , either
                      , QuickCheck
+                     , parsec
                      , text
                      , transformers
                      , lens
@@ -51,6 +53,7 @@ test-suite tic-tac-toe-test
                      , QuickCheck
                      , tasty
                      , tasty-quickcheck
+                     , tasty-hunit
                      , text
                      , TicTacToe
   ghc-options:         -Wall

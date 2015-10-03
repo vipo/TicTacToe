@@ -8,6 +8,7 @@ import qualified Data.Text.Lazy as T
 import qualified Data.Map as Map
 import qualified Data.List as List
 import Test.QuickCheck
+import Numeric
 
 data Action = Validate | Defence | Winner
     deriving (Show, Eq)
@@ -65,7 +66,7 @@ data WireVal = IntVal Int |
     StringVal T.Text |
     DictVal [(T.Text, WireVal)] |
     ListOfVals [WireVal]
-    deriving Show
+    deriving (Show, Eq)
 
 asArray :: [Move] -> WireVal
 asArray moves = ListOfVals $ List.map toTriple moves
@@ -112,7 +113,8 @@ asMap :: [Move] -> WireVal
 asMap moves = DictVal $ List.zip letters vals
     where
         ListOfVals vals = asArray moves
-        letters = List.map (T.pack . (:[])) ['a' .. 'z']
+        letters = List.sort $ List.take (List.length moves) $
+            List.map (\v -> T.pack (showHex v "")) ([0 .. ] :: [Integer])
 
 fromMap :: WireVal -> Maybe [Move]
 fromMap (DictVal pairs) = fromArray $ ListOfVals $ List.map snd $ List.sortOn fst pairs
