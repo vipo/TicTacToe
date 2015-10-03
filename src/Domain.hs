@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MonadComprehensions #-}
 
 module Domain
 where
@@ -75,7 +76,37 @@ asArray moves = ListOfVals $ List.map toTriple moves
             DictVal [("x", IntVal x), ("y", IntVal y), toValue v]
 
 fromArray :: WireVal -> Maybe [Move]
+fromArray (ListOfVals vals) = sequence $ map toMove vals
+    where
+        toMove :: WireVal -> Maybe Move
+        toMove (DictVal pairs) = do
+            x <- lookupX pairs
+            y <- lookupY pairs
+            v <- lookupV pairs
+            return $ Move (Coord x) (Coord y) v
+        toMove _ = Nothing
+        lookupX a = [ val | val <- lookupInt "x" a, val >= 0, val <= 2 ]
+        lookupY a = [ val | val <- lookupInt "y" a, val >= 0, val <= 2 ]
+        lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
 fromArray _ = Nothing
+
+lookupInt :: T.Text -> [(T.Text, WireVal)] -> Maybe Int
+lookupInt _ [] = Nothing
+lookupInt key ((k, IntVal i) : xs) = if key == k then (Just i) else lookupInt key xs
+lookupInt key (_ : xs) = lookupInt key xs
+
+lookupString :: T.Text -> [(T.Text, WireVal)] -> Maybe T.Text
+lookupString _ [] = Nothing
+lookupString key ((k, StringVal s) : xs) = if key == k then (Just s) else lookupString key xs
+lookupString key (_ : xs) = lookupString key xs
+
+boardValue :: T.Text -> Maybe Value
+boardValue "o" = Just O
+boardValue "O" = Just O
+boardValue "0" = Just O
+boardValue "x" = Just X
+boardValue "X" = Just X
+boardValue _ = Nothing
 
 asMap :: [Move] -> WireVal
 asMap moves = DictVal $ List.zip letters vals
@@ -84,4 +115,5 @@ asMap moves = DictVal $ List.zip letters vals
         letters = List.map (T.pack . (:[])) ['a' .. 'z']
 
 fromMap :: WireVal -> Maybe [Move]
+fromMap (DictVal pairs) = fromArray $ ListOfVals $ List.map snd $ List.sortOn fst pairs
 fromMap _ = Nothing
