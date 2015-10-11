@@ -12,6 +12,7 @@ import Domain
 import Text.Parsec.Text.Lazy
 import Text.Parsec
 
+import qualified Data.Maybe as Maybe
 import Data.Either.Combinators
 import qualified Data.Text.Lazy as T
 
@@ -66,7 +67,62 @@ parseBencodeDict = do
 -- json
 
 readJson :: T.Text -> Either T.Text WireVal
-readJson _ = Left "error"
+readJson msg =
+    let wospaces = T.filter (\c -> not (c `elem` [' ', '\n', '\r', '\t'])) msg
+    in mapLeft (\err -> T.pack (show err)) $ parse parseJson "" wospaces
+
+parseJson :: Parser WireVal
+parseJson = parseJsonList
+    <|> parseJsonDict
+    <|> parseInt
+    <|> parseJsonStr
+
+parseQuotedString :: Parser T.Text
+parseQuotedString = do
+    _ <- string "\""
+    s <- many alphaNum
+    _ <- string "\""
+    return $ T.pack s
+
+parseJsonStr :: Parser WireVal
+parseJsonStr = do
+    s <- parseQuotedString
+    return $ StringVal s
+
+parseJsonList :: Parser WireVal
+parseJsonList = do
+    _ <- string "["
+    h <- optionMaybe parseJson
+    t <- many commaSeparated
+    _ <- string "]"
+    return $ ListOfVals $ (Maybe.maybeToList h) ++ t
+    where
+        commaSeparated = do
+            _ <- string ","
+            v <- parseJson
+            return v
+
+
+parseJsonDict :: Parser WireVal
+parseJsonDict = do
+    _ <- string "{"
+    h <- optionMaybe pair
+    t <- many commaSeparated
+    _ <- string "}"
+    return $ DictVal $ (Maybe.maybeToList h) ++ t
+    where
+        pair = do
+            k <- parseQuotedString
+            _ <- string ":"
+            v <- parseJson
+            return (k, v)
+        commaSeparated = do
+            _ <- string ","
+            v <- pair
+            return v
+
+
+-- m-expr
 
 readMExpr :: T.Text -> Either T.Text WireVal
 readMExpr _ = Left "error"

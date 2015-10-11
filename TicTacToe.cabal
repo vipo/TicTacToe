@@ -39,6 +39,7 @@ executable tic-tac-toe
                      , QuickCheck
                      , text
                      , scotty
+                     , text-show
                      , transformers
                      , lens
                      , warp

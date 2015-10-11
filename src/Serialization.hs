@@ -21,7 +21,7 @@ renderScala (ListOfVals vs) = T.concat $
 -- S-expression
 renderSExpr :: WireVal -> Text
 renderSExpr (IntVal i) = T.pack $ show i
-renderSExpr (StringVal s) = T.concat ["\\\"", s, "\\\""]
+renderSExpr (StringVal s) = T.concat ["\"", s, "\""]
 renderSExpr (DictVal d) = T.concat $
     ["(m ", T.intercalate " " (L.map (\(k, v) -> T.concat [k, " ", renderSExpr v]) d), ")"]
 renderSExpr (ListOfVals vs) = T.concat $
@@ -30,7 +30,7 @@ renderSExpr (ListOfVals vs) = T.concat $
 -- M-expression
 renderMExpr :: WireVal -> Text
 renderMExpr (IntVal i) = T.pack $ show i
-renderMExpr (StringVal s) = T.concat ["\\\"", s, "\\\""]
+renderMExpr (StringVal s) = T.concat ["\"", s, "\""]
 renderMExpr (DictVal d) = T.concat $
     ["m[", T.intercalate "; " (L.map (\(k, v) -> T.concat [k, " ", renderMExpr v]) d), "]"]
 renderMExpr (ListOfVals vs) = T.concat $
@@ -39,9 +39,9 @@ renderMExpr (ListOfVals vs) = T.concat $
 -- Json
 renderJson :: WireVal -> Text
 renderJson (IntVal i) = T.pack $ show i
-renderJson (StringVal s) = T.concat ["\\\"", s, "\\\""]
+renderJson (StringVal s) = T.concat ["\"", s, "\""]
 renderJson (DictVal d) = T.concat $
-    ["{", T.intercalate ", " (L.map (\(k, v) -> T.concat ["\\\"", k, "\\\"", ": ", renderJson v]) d), "}"]
+    ["{", T.intercalate ", " (L.map (\(k, v) -> T.concat ["\"", k, "\"", ": ", renderJson v]) d), "}"]
 renderJson (ListOfVals vs) = T.concat $
     ["[", T.intercalate ", " (L.map renderJson vs), "]"]
 

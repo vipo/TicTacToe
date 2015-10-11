@@ -38,6 +38,20 @@ json :: TestTree
 json = testGroup "Json" [
     QC.testProperty "array" $ testArray readJson renderJson
     , QC.testProperty "map" $ testMap readJson renderJson
+    , testCase "some list" $ readJson "[42, \"1234\"]"
+        @?= Right (ListOfVals [IntVal 42, StringVal "1234"])
+    , testCase "empty list" $ readJson "[]"
+        @?= Right (ListOfVals [])
+    , testCase "one element list" $ readJson "[42]"
+        @?= Right (ListOfVals [IntVal 42])
+    , testCase "some map" $ readJson "{ \"1234\" : 42, \"1\": \"1\"} "
+        @?= Right (DictVal [("1234", IntVal 42), ("1", StringVal "1")])
+    , testCase "empty map" $ readJson "{  }"
+        @?= Right (DictVal [])
+    , testCase "one element map" $ readJson "{ \"1\": [] }"
+        @?= Right (DictVal [("1", ListOfVals [])])
+    , testCase "some error" $ isLeft (readJson "{42,}")
+        @?= True
   ]
 
 mexpr :: TestTree

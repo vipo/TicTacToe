@@ -7,6 +7,7 @@ import Control.Lens as Lens
 
 import qualified Data.Text.Lazy as T
 import qualified Data.List as L
+import qualified TextShow as TS
 import Data.Maybe
 
 import Domain
@@ -55,7 +56,7 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
             NoArrays -> renderer $ asMap moves
         dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
-        dataFunction = T.concat ["message = \"", body, "\""]
+        dataFunction = T.concat ["message = ", TS.showtl body]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
 
 thereIsWinner :: [Move] -> Bool
