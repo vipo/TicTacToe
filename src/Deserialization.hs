@@ -17,8 +17,8 @@ import Data.Either.Combinators
 import qualified Data.Text.Lazy as T
 
 -- commons
-parseInt :: Parser WireVal
-parseInt = (many1 digit >>= (\v -> return (IntVal (read v))))
+parseIntVal :: Parser WireVal
+parseIntVal = (many1 digit >>= (\v -> return (IntVal (read v))))
 
 withOutSpaces :: T.Text -> T.Text
 withOutSpaces = T.filter (\c -> not (c `elem` [' ', '\n', '\r', '\t']))
@@ -29,6 +29,11 @@ parseQuotedString = do
     s <- many alphaNum
     _ <- string "\""
     return $ T.pack s
+
+parseQuotedStringVal :: Parser WireVal
+parseQuotedStringVal = do
+    s <- parseQuotedString
+    return $ StringVal s
 
 -- bencode
 
@@ -44,7 +49,7 @@ parseBencode = parseBencodeInt
 parseBencodeInt :: Parser WireVal
 parseBencodeInt = do
     _ <- string "i"
-    i <- parseInt
+    i <- parseIntVal
     _ <- string "e"
     return i
 
@@ -83,13 +88,8 @@ readJson msg =
 parseJson :: Parser WireVal
 parseJson = parseJsonList
     <|> parseJsonDict
-    <|> parseInt
-    <|> parseJsonStr
-
-parseJsonStr :: Parser WireVal
-parseJsonStr = do
-    s <- parseQuotedString
-    return $ StringVal s
+    <|> parseIntVal
+    <|> parseQuotedStringVal
 
 parseJsonList :: Parser WireVal
 parseJsonList = do
@@ -127,8 +127,50 @@ parseJsonDict = do
 readMExpr :: T.Text -> Either T.Text WireVal
 readMExpr _ = Left "error"
 
+-- s-expr
+
 readSExpr :: T.Text -> Either T.Text WireVal
-readSExpr _ = Left "error"
+readSExpr msg =
+    mapLeft (\err -> T.pack (show err)) $ parse parseSExpr "" msg
+
+parseSExpr :: Parser WireVal
+parseSExpr = parseNested
+    <|> parseIntVal
+    <|> parseQuotedStringVal
+
+parseNested :: Parser WireVal
+parseNested = do
+    _ <- string "("
+    ds <- parseStartedSExprList <|>  parseStartedSExprDict
+    return ds
+
+parseStartedSExprList :: Parser WireVal
+parseStartedSExprList = do
+    _ <- string "l"
+    _ <- many space
+    t <- many spaceSeparated
+    _ <- string ")"
+    return $ ListOfVals t
+    where
+        spaceSeparated = do
+            v <- parseSExpr
+            _ <- many space
+            return v
+
+parseStartedSExprDict :: Parser WireVal
+parseStartedSExprDict = do
+    _ <- string "m"
+    _ <- many space
+    t <- many spaceSeparated
+    _ <- string ")"
+    return $ DictVal t
+    where
+        spaceSeparated = do
+            k <- parseQuotedString
+            _ <- many space
+            v <- parseSExpr
+            _ <- many space
+            return (k, v)
 
 -- scala
 
@@ -142,7 +184,7 @@ parseScala = parseScalaList
     <|> parseScalaValue
 
 parseScalaValue :: Parser WireVal
-parseScalaValue = try parseInt <|> parseScalaStr
+parseScalaValue = try parseIntVal <|> parseScalaStr
 
 parseScalaStr :: Parser WireVal
 parseScalaStr = do

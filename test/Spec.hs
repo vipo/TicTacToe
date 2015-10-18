@@ -62,8 +62,22 @@ mexpr = testGroup "MExpr" [
 
 sexpr :: TestTree
 sexpr = testGroup "SExpr" [
-    QC.testProperty "array" $ testArray readSExpr renderSExpr 
+    QC.testProperty "array" $ testArray readSExpr renderSExpr
     , QC.testProperty "map" $ testMap readSExpr renderSExpr
+    , testCase "some list" $ readSExpr "(l 42 \"a1234\")"
+        @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
+    , testCase "empty list" $ readSExpr "(l  )"
+        @?= Right (ListOfVals [])
+    , testCase "one element list" $ readSExpr "(l 42)"
+        @?= Right (ListOfVals [IntVal 42])
+    , testCase "some map" $ readSExpr "(m \"1234\" 42 \"1\" \"a1\") "
+        @?= Right (DictVal [("1234", IntVal 42), ("1", StringVal "a1")])
+    , testCase "empty map" $ readSExpr "(m)"
+        @?= Right (DictVal [])
+    , testCase "one element map" $ readSExpr "(m \"1\" (l))"
+        @?= Right (DictVal [("1", ListOfVals [])])
+    , testCase "some error" $ isLeft (readSExpr "(m 42)")
+        @?= True
   ]
 
 scala :: TestTree

@@ -23,7 +23,7 @@ renderSExpr :: WireVal -> Text
 renderSExpr (IntVal i) = T.pack $ show i
 renderSExpr (StringVal s) = T.concat ["\"", s, "\""]
 renderSExpr (DictVal d) = T.concat $
-    ["(m ", T.intercalate " " (L.map (\(k, v) -> T.concat [k, " ", renderSExpr v]) d), ")"]
+    ["(m ", T.intercalate " " (L.map (\(k, v) -> T.concat ["\"", k, "\"", " ", renderSExpr v]) d), ")"]
 renderSExpr (ListOfVals vs) = T.concat $
     ["(l ", T.intercalate " " (L.map renderSExpr vs), ")"]
 
@@ -32,7 +32,7 @@ renderMExpr :: WireVal -> Text
 renderMExpr (IntVal i) = T.pack $ show i
 renderMExpr (StringVal s) = T.concat ["\"", s, "\""]
 renderMExpr (DictVal d) = T.concat $
-    ["m[", T.intercalate "; " (L.map (\(k, v) -> T.concat [k, " ", renderMExpr v]) d), "]"]
+    ["m[", T.intercalate "; " (L.map (\(k, v) -> T.concat ["\"", k, "\"", " ", renderMExpr v]) d), "]"]
 renderMExpr (ListOfVals vs) = T.concat $
     ["l[", T.intercalate "; " (L.map renderMExpr vs), "]"]
 
