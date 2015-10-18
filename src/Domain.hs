@@ -104,7 +104,6 @@ lookupString key (_ : xs) = lookupString key xs
 boardValue :: T.Text -> Maybe Value
 boardValue "o" = Just O
 boardValue "O" = Just O
-boardValue "0" = Just O
 boardValue "x" = Just X
 boardValue "X" = Just X
 boardValue _ = Nothing

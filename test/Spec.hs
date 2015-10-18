@@ -70,6 +70,21 @@ scala :: TestTree
 scala = testGroup "Scala" [
     QC.testProperty "array" $ testArray readScala renderScala
     , QC.testProperty "map" $ testMap readScala renderScala
+    , testCase "some list" $ readScala "List(42, a1234)"
+        @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
+    , testCase "empty list" $ readScala "List()"
+        @?= Right (ListOfVals [])
+    , testCase "one element list" $ readScala "List(42)"
+        @?= Right (ListOfVals [IntVal 42])
+    , testCase "some map" $ readScala "Map (1234 -> 42, 1 -> a1) "
+        @?= Right (DictVal [("1234", IntVal 42), ("1", StringVal "a1")])
+    , testCase "empty map" $ readScala "Map ( )"
+        @?= Right (DictVal [])
+    , testCase "one element map" $ readScala "Map (1 -> List() )"
+        @?= Right (DictVal [("1", ListOfVals [])])
+    , testCase "some error" $ isLeft (readScala "Map(42)")
+        @?= True
+
   ]
 
 testArray :: (T.Text -> Either T.Text WireVal) -> (WireVal -> T.Text) -> [Move] -> Bool
