@@ -125,7 +125,45 @@ parseJsonDict = do
 -- m-expr
 
 readMExpr :: T.Text -> Either T.Text WireVal
-readMExpr _ = Left "error"
+readMExpr msg =
+    mapLeft (\err -> T.pack (show err)) $ parse parseMExpr "" $ withOutSpaces msg
+
+parseMExpr :: Parser WireVal
+parseMExpr = parseMExprList
+    <|> parseMExprDict
+    <|> parseIntVal
+    <|> parseQuotedStringVal
+
+parseMExprList :: Parser WireVal
+parseMExprList = do
+    _ <- string "l["
+    h <- optionMaybe parseMExpr
+    t <- many commaSeparated
+    _ <- string "]"
+    return $ ListOfVals $ (Maybe.maybeToList h) ++ t
+    where
+        commaSeparated = do
+            _ <- string ";"
+            v <- parseMExpr
+            return v
+
+parseMExprDict :: Parser WireVal
+parseMExprDict = do
+    _ <- string "m["
+    h <- optionMaybe pair
+    t <- many commaSeparated
+    _ <- string "]"
+    return $ DictVal $ (Maybe.maybeToList h) ++ t
+    where
+        pair = do
+            k <- parseQuotedString
+            _ <- string ";"
+            v <- parseMExpr
+            return (k, v)
+        commaSeparated = do
+            _ <- string ";"
+            v <- pair
+            return v
 
 -- s-expr
 

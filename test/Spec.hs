@@ -58,6 +58,20 @@ mexpr :: TestTree
 mexpr = testGroup "MExpr" [
     QC.testProperty "array" $ testArray readMExpr renderMExpr
     , QC.testProperty "map" $ testMap readMExpr renderMExpr
+    , testCase "some list" $ readMExpr "l[ 42 ;\"a1234\"]"
+        @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
+    , testCase "empty list" $ readMExpr "l[]"
+        @?= Right (ListOfVals [])
+    , testCase "one element list" $ readMExpr "l[ 42]"
+        @?= Right (ListOfVals [IntVal 42])
+    , testCase "some map" $ readMExpr "m[\"1234\"; 42; \"1\";\"a1\"] "
+        @?= Right (DictVal [("1234", IntVal 42), ("1", StringVal "a1")])
+    , testCase "empty map" $ readMExpr "m[]"
+        @?= Right (DictVal [])
+    , testCase "one element map" $ readMExpr "m[\"1\"; l[]]"
+        @?= Right (DictVal [("1", ListOfVals [])])
+    , testCase "some error" $ isLeft (readMExpr "m[42]")
+        @?= True
   ]
 
 sexpr :: TestTree
