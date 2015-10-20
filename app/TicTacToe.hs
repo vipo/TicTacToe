@@ -111,17 +111,17 @@ printBoard moves = T.concat [
         result = vals (L.take 9 (L.repeat emptyCell)) moves
 
 readBoardFromWire :: Maybe T.Text -> BSL.ByteString -> Either (Int, BS.ByteString, BSL.ByteString) Moves
-readBoardFromWire (Just "application/bencode+list") b = tpr readBencode fromArray b 
-readBoardFromWire (Just "application/json+list") b = tpr readJson fromArray b
-readBoardFromWire (Just "application/s-expr+list") b = tpr readSExpr fromArray b
-readBoardFromWire (Just "application/m-expr+list") b = tpr readMExpr fromArray b
-readBoardFromWire (Just "application/scala+list") b = tpr readScala fromArray b
-readBoardFromWire (Just "application/bencode+map") b = tpr readBencode fromMap b
-readBoardFromWire (Just "application/json+map") b = tpr readJson fromMap b
-readBoardFromWire (Just "application/s-expr+map") b = tpr readSExpr fromMap b
-readBoardFromWire (Just "application/m-expr+map") b = tpr readMExpr fromMap b
-readBoardFromWire (Just "application/scala+map") b = tpr readScala fromMap b
-readBoardFromWire _ _ = Left (415, toBS "Unsupported Media Type", BSL.empty)
+readBoardFromWire (Just "application/bencode+list") = tpr readBencode fromArray
+readBoardFromWire (Just "application/json+list") = tpr readJson fromArray
+readBoardFromWire (Just "application/s-expr+list") = tpr readSExpr fromArray
+readBoardFromWire (Just "application/m-expr+list") = tpr readMExpr fromArray
+readBoardFromWire (Just "application/scala+list") = tpr readScala fromArray
+readBoardFromWire (Just "application/bencode+map") = tpr readBencode fromMap
+readBoardFromWire (Just "application/json+map") = tpr readJson fromMap
+readBoardFromWire (Just "application/s-expr+map") = tpr readSExpr fromMap
+readBoardFromWire (Just "application/m-expr+map") = tpr readMExpr fromMap
+readBoardFromWire (Just "application/scala+map") = tpr readScala fromMap
+readBoardFromWire _ = (\_ -> Left (415, toBS "Unsupported Media Type", BSL.empty))
 
 tpr :: (T.Text -> Either T.Text WireVal)
     -> (WireVal -> Maybe Moves) -> BSL.ByteString
