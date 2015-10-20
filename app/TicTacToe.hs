@@ -5,9 +5,15 @@ where
 
 import Control.Lens as Lens
 
+import Deserialization
+
 import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Data.List as L
 import qualified TextShow as TS
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import qualified Codec.Binary.UTF8.String as UTF
 import Data.Maybe
 
 import Domain
@@ -103,3 +109,38 @@ printBoard moves = T.concat [
                 old = acc ^?! element coord
         emptyCell = " "
         result = vals (L.take 9 (L.repeat emptyCell)) moves
+
+readBoardFromWire :: Maybe T.Text -> BSL.ByteString -> Either (Int, BS.ByteString, BSL.ByteString) Moves
+readBoardFromWire (Just "application/bencode+list") b = tpr readBencode fromArray b 
+readBoardFromWire (Just "application/json+list") b = tpr readJson fromArray b
+readBoardFromWire (Just "application/s-expr+list") b = tpr readSExpr fromArray b
+readBoardFromWire (Just "application/m-expr+list") b = tpr readMExpr fromArray b
+readBoardFromWire (Just "application/scala+list") b = tpr readScala fromArray b
+readBoardFromWire (Just "application/bencode+map") b = tpr readBencode fromMap b
+readBoardFromWire (Just "application/json+map") b = tpr readJson fromMap b
+readBoardFromWire (Just "application/s-expr+map") b = tpr readSExpr fromMap b
+readBoardFromWire (Just "application/m-expr+map") b = tpr readMExpr fromMap b
+readBoardFromWire (Just "application/scala+map") b = tpr readScala fromMap b
+readBoardFromWire _ _ = Left (415, toBS "Unsupported Media Type", BSL.empty)
+
+tpr :: (T.Text -> Either T.Text WireVal)
+    -> (WireVal -> Maybe Moves) -> BSL.ByteString
+    -> Either (Int, BS.ByteString, BSL.ByteString) Moves
+tpr reader transformer bytes =
+    case reader (TLE.decodeUtf8 bytes) of
+        Left err -> Left (400, badRequest, TLE.encodeUtf8 err)
+        Right w -> case transformer w of
+                    Nothing -> Left (400, badRequest, illegalFormat)
+                    Just m -> Right m
+
+toBS :: String -> BS.ByteString
+toBS = BS.pack . UTF.encode
+
+toBSL :: String -> BSL.ByteString
+toBSL = BSL.pack . UTF.encode
+
+badRequest :: BS.ByteString
+badRequest = toBS "Bad request"
+
+illegalFormat :: BSL.ByteString
+illegalFormat = toBSL "Illegal format, i.e. got array instead of map"

@@ -35,7 +35,11 @@ executable tic-tac-toe
   other-modules:       TicTacToe
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
+                     , bytestring
+                     , utf8-string
                      , containers
+                     , hedis
+                     , http-types
                      , QuickCheck
                      , text
                      , scotty

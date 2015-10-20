@@ -25,6 +25,8 @@ type TaskId = Int
 data Value = X | O
     deriving (Show, Eq)
 
+type Moves = [Move]
+
 instance Arbitrary Value where
     arbitrary = elements [X, O]
 
