@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MonadComprehensions #-}
 
 module TicTacToe
 where
@@ -15,6 +16,8 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Codec.Binary.UTF8.String as UTF
 import Data.Maybe
+
+import qualified Database.Redis as R
 
 import Domain
 import Serialization
@@ -133,14 +136,49 @@ tpr reader transformer bytes =
                     Nothing -> Left (400, badRequest, illegalFormat)
                     Just m -> Right m
 
+record :: R.Connection -> Moves -> T.Text -> IO (Int, BS.ByteString, BSL.ByteString)
+record conn moves gameId = do
+    state <- currentState conn gameId
+    case state of
+        Right (len, gameNum) | len < 9 -> do
+            saveMoves conn gameId moves gameNum
+            return (200, "OK", BSL.empty)
+        _ -> return (500, "Internal Server Error", "The game is finished")
+
 toBS :: String -> BS.ByteString
 toBS = BS.pack . UTF.encode
 
 toBSL :: String -> BSL.ByteString
 toBSL = BSL.pack . UTF.encode
 
+lt2bs :: T.Text -> BS.ByteString
+lt2bs = BSL.toStrict . TLE.encodeUtf8
+
 badRequest :: BS.ByteString
 badRequest = toBS "Bad request"
 
 illegalFormat :: BSL.ByteString
 illegalFormat = toBSL "Illegal format, i.e. got array instead of map"
+
+-- Redis stuff
+
+channelKey :: T.Text -> BS.ByteString
+channelKey gameId = lt2bs $ T.concat ["channel:", gameId]
+
+historyKey :: T.Text -> BS.ByteString
+historyKey gameId = lt2bs $ T.concat ["history:", gameId]
+
+currentState :: R.Connection -> T.Text -> IO (Either R.Reply (Integer, Integer))
+currentState conn gameId = R.runRedis conn $ do
+    len <- R.llen $ historyKey gameId
+    count <- R.incr "counter"
+    return $ [ (l, c) | l <- len, c <- count ]
+
+saveMoves :: R.Connection -> T.Text -> Moves -> Integer -> IO ()
+saveMoves conn gameId moves moveNum = R.runRedis conn $ do
+    let asJson = renderJson $ asArray moves
+    let d = map lt2bs [asJson]
+    _ <- R.zadd "games" [(fromIntegral moveNum, lt2bs gameId)]
+    _ <- R.rpush (historyKey gameId) d 
+    _ <- R.rpush (channelKey gameId) d
+    return ()

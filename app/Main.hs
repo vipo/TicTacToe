@@ -21,14 +21,14 @@ main = do
   conn <- connect defaultConnectInfo
   scottyOpts opts $ do
     post "/game/:id" $ do
-      --gameId <- param "id" :: String
+      gameId <- param "id"
       ct <- fmap (lookup "Content-Type") headers
       bd <- body
-      case readBoardFromWire ct bd of
-        Left (code, msg, details) -> do
-          status $ Status code msg
-          raw details
-        Right _ -> status ok200
+      (c, m, d) <-  case readBoardFromWire ct bd of
+                    Left l -> return l
+                    Right moves -> liftIO $ record conn moves gameId
+      status $ Status c m
+      raw d
     get "/test/:id" $ do
       taskId <- param "id"
       unless (taskId >= 1 && taskId <= taskQuantity) next
