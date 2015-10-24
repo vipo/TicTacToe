@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Main where
 
@@ -16,19 +17,32 @@ import qualified Network.Wai.Handler.Warp as W
 opts :: Options
 opts = Options 1 (W.setHost "127.0.0.1" W.defaultSettings)
 
+instance Parsable Player where
+    parseParam "1" = Right Player1
+    parseParam "2" = Right Player2
+    parseParam _ = Left "Illegal player id"
+
+instance Parsable GameId where
+    parseParam = Right . GameId
+
 main :: IO ()
 main = do
   conn <- connect defaultConnectInfo
   scottyOpts opts $ do
-    post "/game/:id" $ do
-      gameId <- param "id"
+    post "/game/:gid/player/:pid" $ do
+      gameId <- param "gid"
+      playerId <- param "pid"
       ct <- fmap (lookup "Content-Type") headers
       bd <- body
       (c, m, d) <-  case readBoardFromWire ct bd of
                     Left l -> return l
-                    Right moves -> liftIO $ record conn moves gameId
+                    Right moves -> liftIO $ record conn moves gameId playerId
       status $ Status c m
       raw d
+    get "/history/:gid" $ do
+      gameId <- param "gid"
+      result <- liftIO $ gameHistory conn gameId
+      text result
     get "/test/:id" $ do
       taskId <- param "id"
       unless (taskId >= 1 && taskId <= taskQuantity) next

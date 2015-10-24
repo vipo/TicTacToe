@@ -136,14 +136,33 @@ tpr reader transformer bytes =
                     Nothing -> Left (400, badRequest, illegalFormat)
                     Just m -> Right m
 
-record :: R.Connection -> Moves -> T.Text -> IO (Int, BS.ByteString, BSL.ByteString)
-record conn moves gameId = do
+data Player = Player1 | Player2
+
+data GameId = GameId ! T.Text
+
+oppositePlayer :: Player -> Player
+oppositePlayer Player1 = Player2
+oppositePlayer Player2 = Player1
+
+record :: R.Connection -> Moves -> GameId -> Player -> IO (Int, BS.ByteString, BSL.ByteString)
+record conn moves gameId playerId = do
     state <- currentState conn gameId
     case state of
         Right (len, gameNum) | len < 9 -> do
-            saveMoves conn gameId moves gameNum
+            saveMoves conn gameId playerId moves gameNum
             return (200, "OK", BSL.empty)
         _ -> return (500, "Internal Server Error", "The game is finished")
+
+gameHistory :: R.Connection -> GameId -> IO T.Text
+gameHistory conn gameId = do
+    his <- history conn gameId
+    let indexed = zip [1..] $ map (printBoard . readJsonOptimistically . bs2lt) his
+    return $ T.intercalate "\n" $ map (\(i, d) -> T.concat ["Move ", T.pack (show i), ":\n", d]) indexed
+
+readJsonOptimistically :: T.Text -> Moves
+readJsonOptimistically t = case readJson t of
+                            Right v -> fromMaybe [] $ fromArray v
+                            Left _ -> []
 
 toBS :: String -> BS.ByteString
 toBS = BS.pack . UTF.encode
@@ -154,31 +173,48 @@ toBSL = BSL.pack . UTF.encode
 lt2bs :: T.Text -> BS.ByteString
 lt2bs = BSL.toStrict . TLE.encodeUtf8
 
+bs2lt :: BS.ByteString -> T.Text
+bs2lt = TLE.decodeUtf8 . BSL.fromStrict
+
 badRequest :: BS.ByteString
 badRequest = toBS "Bad request"
 
 illegalFormat :: BSL.ByteString
 illegalFormat = toBSL "Illegal format, i.e. got array instead of map"
 
--- Redis stuff
+history :: R.Connection -> GameId -> IO [BS.ByteString]
+history conn gameId = R.runRedis conn $ do
+    els <- R.lrange (historyKey gameId) 0 8
+    ret <- case els of 
+            Right r -> return r
+            Left _ -> return []
+    return ret
 
-channelKey :: T.Text -> BS.ByteString
-channelKey gameId = lt2bs $ T.concat ["channel:", gameId]
+channelKey :: GameId -> Player -> BS.ByteString
+channelKey (GameId gameId) playerId =
+    lt2bs $ T.concat ["channel:", gameId, ":", playerString playerId]
+    where
+        playerString Player1 = "1"
+        playerString Player2 = "2"
 
-historyKey :: T.Text -> BS.ByteString
-historyKey gameId = lt2bs $ T.concat ["history:", gameId]
+historyKey :: GameId -> BS.ByteString
+historyKey (GameId gameId) = lt2bs $ T.concat ["history:", gameId]
 
-currentState :: R.Connection -> T.Text -> IO (Either R.Reply (Integer, Integer))
+currentState :: R.Connection -> GameId -> IO (Either R.Reply (Integer, Integer))
 currentState conn gameId = R.runRedis conn $ do
     len <- R.llen $ historyKey gameId
     count <- R.incr "counter"
     return $ [ (l, c) | l <- len, c <- count ]
 
-saveMoves :: R.Connection -> T.Text -> Moves -> Integer -> IO ()
-saveMoves conn gameId moves moveNum = R.runRedis conn $ do
+saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
+saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do
     let asJson = renderJson $ asArray moves
     let d = map lt2bs [asJson]
-    _ <- R.zadd "games" [(fromIntegral moveNum, lt2bs gameId)]
-    _ <- R.rpush (historyKey gameId) d 
-    _ <- R.rpush (channelKey gameId) d
+    _ <- R.multiExec $ do
+        _ <- R.zadd "games" [(fromIntegral moveNum, rawGameId gameId)]
+        _ <- R.rpush (historyKey gameId) d 
+        _ <- R.rpush (channelKey gameId (oppositePlayer playerId)) d
+        return $ return ()
     return ()
+    where
+        rawGameId (GameId v) = lt2bs v
