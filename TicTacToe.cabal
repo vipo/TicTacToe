@@ -36,6 +36,8 @@ executable tic-tac-toe
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
                      , bytestring
+                     , blaze-html
+                     , blaze-markup
                      , utf8-string
                      , containers
                      , hedis

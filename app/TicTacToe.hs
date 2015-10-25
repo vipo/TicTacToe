@@ -5,8 +5,13 @@ module TicTacToe
 where
 
 import Control.Lens as Lens
-
+import Control.Monad (forM_)
 import Deserialization
+
+import qualified Text.Blaze.Html5 as H
+import Text.Blaze.Html5 ((!))
+import qualified Text.Blaze.Html5.Attributes as A
+import Text.Blaze.Html.Renderer.Text
 
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as TLE
@@ -15,7 +20,10 @@ import qualified TextShow as TS
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Codec.Binary.UTF8.String as UTF
+import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
+
+import qualified Data.Map.Strict as Map
 
 import qualified Database.Redis as R
 
@@ -113,18 +121,44 @@ printBoard moves = T.concat [
         emptyCell = " "
         result = vals (L.take 9 (L.repeat emptyCell)) moves
 
+transformers :: Map.Map T.Text (
+        (T.Text -> Either T.Text WireVal),
+        (WireVal -> Maybe Moves),
+        ([Move] -> WireVal),
+        (WireVal -> T.Text))
+transformers = Map.fromList [
+        ("application/bencode+list", (readBencode, fromArray, asArray, renderBencode))
+        , ("application/json+list", (readJson, fromArray, asArray, renderJson))
+        , ("application/s-expr+list", (readSExpr, fromArray, asArray, renderSExpr))
+        , ("application/m-expr+list", (readMExpr, fromArray, asArray, renderMExpr))
+        , ("application/scala+list", (readScala, fromArray, asArray, renderScala))
+        , ("application/bencode+map", (readBencode, fromMap, asMap, renderBencode))
+        , ("application/json+map", (readJson, fromMap, asMap, renderJson))
+        , ("application/s-expr+map", (readSExpr, fromMap, asMap, renderSExpr))
+        , ("application/m-expr+map", (readMExpr, fromMap, asMap, renderMExpr))
+        , ("application/scala+map", (readScala, fromMap, asMap, renderScala))
+    ]
+
+plainText :: T.Text
+plainText = "text/plain; charset=UTF-8"
+
+retrieveMove :: R.Connection -> Maybe T.Text -> GameId -> Player -> IO (Int, BS.ByteString, BSL.ByteString, T.Text)
+retrieveMove conn acc gameId playerId =
+    case (acc >>= (\x -> Map.lookup x transformers >>= (\t -> return (x, t)))) of
+        Nothing -> return (415, toBS "Unsupported Media Type", toBSL "Unknown Accept header", plainText)
+        Just (ct, (_, _, tr, ren)) -> do
+            raw <- readFromChannel conn gameId playerId
+            case raw of
+                Nothing -> return (500, "Internal Server Error", toBSL "No move data available at the moment", plainText)
+                Just d -> do
+                    let resp = ren $ tr $ readJsonOptimistically $ bs2lt d
+                    return (200, "OK", TLE.encodeUtf8 resp, ct)
+
 readBoardFromWire :: Maybe T.Text -> BSL.ByteString -> Either (Int, BS.ByteString, BSL.ByteString) Moves
-readBoardFromWire (Just "application/bencode+list") = tpr readBencode fromArray
-readBoardFromWire (Just "application/json+list") = tpr readJson fromArray
-readBoardFromWire (Just "application/s-expr+list") = tpr readSExpr fromArray
-readBoardFromWire (Just "application/m-expr+list") = tpr readMExpr fromArray
-readBoardFromWire (Just "application/scala+list") = tpr readScala fromArray
-readBoardFromWire (Just "application/bencode+map") = tpr readBencode fromMap
-readBoardFromWire (Just "application/json+map") = tpr readJson fromMap
-readBoardFromWire (Just "application/s-expr+map") = tpr readSExpr fromMap
-readBoardFromWire (Just "application/m-expr+map") = tpr readMExpr fromMap
-readBoardFromWire (Just "application/scala+map") = tpr readScala fromMap
-readBoardFromWire _ = (\_ -> Left (415, toBS "Unsupported Media Type", BSL.empty))
+readBoardFromWire ct body =
+    case (ct >>= (\x -> Map.lookup x transformers)) of
+        Nothing -> Left (415, toBS "Unsupported Media Type", BSL.empty)
+        Just (reader, ds, _, _) -> tpr reader ds body
 
 tpr :: (T.Text -> Either T.Text WireVal)
     -> (WireVal -> Maybe Moves) -> BSL.ByteString
@@ -156,13 +190,27 @@ record conn moves gameId playerId = do
 gameHistory :: R.Connection -> GameId -> IO T.Text
 gameHistory conn gameId = do
     his <- history conn gameId
-    let indexed = zip [1..] $ map (printBoard . readJsonOptimistically . bs2lt) his
-    return $ T.intercalate "\n" $ map (\(i, d) -> T.concat ["Move ", T.pack (show i), ":\n", d]) indexed
+    let nums = [1..] :: [Integer]
+    let ind = zip (map show nums) $ map (printBoard . readJsonOptimistically . bs2lt) his
+    return $ T.intercalate "\n" $ map (\(i, d) -> T.concat ["Move ", T.pack i, ":\n", d]) ind
 
 readJsonOptimistically :: T.Text -> Moves
 readJsonOptimistically t = case readJson t of
                             Right v -> fromMaybe [] $ fromArray v
                             Left _ -> []
+
+gameTop :: R.Connection -> IO T.Text
+gameTop conn = do
+    gameIds <- lastGames conn
+    let html = H.docTypeHtml $ do
+            H.head $ do
+                H.title "History"
+            H.body $ do
+                H.h1 "Last games"
+                H.ol $ forM_ (map (\(GameId g) -> g) gameIds) toLink
+    return $ renderHtml html
+    where
+        toLink g = H.li $ H.a ! A.href (H.toValue $ T.concat ["/history/", g]) $ H.toHtml g
 
 toBS :: String -> BS.ByteString
 toBS = BS.pack . UTF.encode
@@ -200,10 +248,16 @@ channelKey (GameId gameId) playerId =
 historyKey :: GameId -> BS.ByteString
 historyKey (GameId gameId) = lt2bs $ T.concat ["history:", gameId]
 
+counterKey :: BS.ByteString
+counterKey = "counter"
+
+gamesKey :: BS.ByteString
+gamesKey = "games"
+
 currentState :: R.Connection -> GameId -> IO (Either R.Reply (Integer, Integer))
 currentState conn gameId = R.runRedis conn $ do
     len <- R.llen $ historyKey gameId
-    count <- R.incr "counter"
+    count <- R.incr counterKey
     return $ [ (l, c) | l <- len, c <- count ]
 
 saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
@@ -211,10 +265,29 @@ saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do
     let asJson = renderJson $ asArray moves
     let d = map lt2bs [asJson]
     _ <- R.multiExec $ do
-        _ <- R.zadd "games" [(fromIntegral moveNum, rawGameId gameId)]
-        _ <- R.rpush (historyKey gameId) d 
+        _ <- R.zadd gamesKey [(fromIntegral moveNum, rawGameId gameId)]
+        _ <- R.rpush (historyKey gameId) d
         _ <- R.rpush (channelKey gameId (oppositePlayer playerId)) d
         return $ return ()
     return ()
     where
         rawGameId (GameId v) = lt2bs v
+
+readFromChannel :: R.Connection -> GameId -> Player -> IO (Maybe BS.ByteString)
+readFromChannel conn gameId playerId = do
+    v <- R.runRedis conn $ R.blpop [channelKey gameId playerId] 5
+    case v of
+        Right (Just (_, b)) -> return $ Just b
+        _ -> return Nothing
+
+lastGames :: R.Connection -> IO [GameId]
+lastGames conn = R.runRedis conn $ do
+    c <- R.get counterKey
+    let counter = case c of
+                    Right (Just v) -> read $ C8.unpack v
+                    _ -> 0 :: Integer
+    range <- R.zrevrangebyscoreLimit gamesKey (fromIntegral counter) (
+        fromIntegral (0 :: Integer)) 0 30
+    case range of
+        Left _ -> return []
+        Right r -> return $ map (GameId . bs2lt) r
