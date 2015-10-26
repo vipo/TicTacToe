@@ -265,11 +265,9 @@ saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
 saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do
     let asJson = renderJson $ asArray moves
     let d = map lt2bs [asJson]
-    _ <- R.multiExec $ do
-        _ <- R.zadd gamesKey [(fromIntegral moveNum, rawGameId gameId)]
-        _ <- R.rpush (historyKey gameId) d
-        _ <- R.rpush (channelKey gameId (oppositePlayer playerId)) d
-        return $ return ()
+    _ <- R.zadd gamesKey [(fromIntegral moveNum, rawGameId gameId)]
+    _ <- R.rpush (historyKey gameId) d
+    _ <- R.rpush (channelKey gameId (oppositePlayer playerId)) d
     return ()
     where
         rawGameId (GameId v) = lt2bs v
