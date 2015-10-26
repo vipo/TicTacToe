@@ -180,12 +180,12 @@ oppositePlayer Player2 = Player1
 
 record :: R.Connection -> Moves -> GameId -> Player -> IO (Int, BS.ByteString, BSL.ByteString)
 record conn moves gameId playerId = do
-    state <- currentState conn gameId
+    state <- currentState conn gameId playerId
     case state of
-        Right (len, gameNum) | len < 9 -> do
+        Right (len, opp, gameNum) | len < 9 && opp < 1 -> do
             saveMoves conn gameId playerId moves gameNum
             return (200, "OK", BSL.empty)
-        _ -> return (500, "Internal Server Error", "The game is finished")
+        _ -> return (500, "Internal Server Error", "Invalid game state")
 
 gameHistory :: R.Connection -> GameId -> IO T.Text
 gameHistory conn gameId = do
@@ -254,11 +254,12 @@ counterKey = "counter"
 gamesKey :: BS.ByteString
 gamesKey = "games"
 
-currentState :: R.Connection -> GameId -> IO (Either R.Reply (Integer, Integer))
-currentState conn gameId = R.runRedis conn $ do
+currentState :: R.Connection -> GameId -> Player -> IO (Either R.Reply (Integer, Integer, Integer))
+currentState conn gameId playerId = R.runRedis conn $ do
     len <- R.llen $ historyKey gameId
+    opp <- R.llen $ channelKey gameId (oppositePlayer playerId)
     count <- R.incr counterKey
-    return $ [ (l, c) | l <- len, c <- count ]
+    return $ [ (l, o, c) | l <- len, o <- opp, c <- count ]
 
 saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
 saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do
