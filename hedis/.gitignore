@@ -1,0 +1,9 @@
+
+/redis/
+/dist/
+/cabal-dev/
+dump.rdb
+appendonly.aof
+*.prof
+/.hpc
+Main.hs

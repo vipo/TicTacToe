@@ -1,5 +1,6 @@
 flags: {}
 packages:
 - '.'
+- './hedis'
 extra-deps: []
 resolver: lts-3.6
