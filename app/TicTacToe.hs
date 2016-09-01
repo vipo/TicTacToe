@@ -43,7 +43,7 @@ randomMoves = do
     count <- generate countGen
     coords <- generate coordGen
     let pairs = L.zip orderedValues coords
-    let full = L.map (\(v, c) -> Move (Coord (fst c)) (Coord (snd c)) v) $ pairs 
+    let full = L.map (\(v, c) -> Move (Coord (fst c)) (Coord (snd c)) v) $ pairs
     return $ L.take count full
 
 taskQuantity :: Int
@@ -69,8 +69,8 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
                 (_, h : _) -> h
                 _ -> []
         body = case modifier of
-            AsIs -> renderer $ asArray moves
-            NoArrays -> renderer $ asMap moves
+            AsIs -> renderer $ asArrayOfMaps moves
+            NoArrays -> renderer $ asMapOfMaps moves
         dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
         dataFunction = T.concat ["message = ", TS.showtl body]
@@ -127,16 +127,16 @@ transformers :: Map.Map T.Text (
         ([Move] -> WireVal),
         (WireVal -> T.Text))
 transformers = Map.fromList [
-        ("application/bencode+list", (readBencode, fromArray, asArray, renderBencode))
-        , ("application/json+list", (readJson, fromArray, asArray, renderJson))
-        , ("application/s-expr+list", (readSExpr, fromArray, asArray, renderSExpr))
-        , ("application/m-expr+list", (readMExpr, fromArray, asArray, renderMExpr))
-        , ("application/scala+list", (readScala, fromArray, asArray, renderScala))
-        , ("application/bencode+map", (readBencode, fromMap, asMap, renderBencode))
-        , ("application/json+map", (readJson, fromMap, asMap, renderJson))
-        , ("application/s-expr+map", (readSExpr, fromMap, asMap, renderSExpr))
-        , ("application/m-expr+map", (readMExpr, fromMap, asMap, renderMExpr))
-        , ("application/scala+map", (readScala, fromMap, asMap, renderScala))
+          ("application/bencode+list", (readBencode, fromArrayOfMaps, asArrayOfMaps, renderBencode))
+        , ("application/json+list",    (readJson,    fromArrayOfMaps, asArrayOfMaps, renderJson))
+        , ("application/s-expr+list",  (readSExpr,   fromArrayOfMaps, asArrayOfMaps, renderSExpr))
+        , ("application/m-expr+list",  (readMExpr,   fromArrayOfMaps, asArrayOfMaps, renderMExpr))
+        , ("application/scala+list",   (readScala,   fromArrayOfMaps, asArrayOfMaps, renderScala))
+        , ("application/bencode+map",  (readBencode, fromMapOfMaps,   asMapOfMaps,   renderBencode))
+        , ("application/json+map",     (readJson,    fromMapOfMaps,   asMapOfMaps,   renderJson))
+        , ("application/s-expr+map",   (readSExpr,   fromMapOfMaps,   asMapOfMaps,   renderSExpr))
+        , ("application/m-expr+map",   (readMExpr,   fromMapOfMaps,   asMapOfMaps,   renderMExpr))
+        , ("application/scala+map",    (readScala,   fromMapOfMaps,   asMapOfMaps,   renderScala))
     ]
 
 plainText :: T.Text
@@ -196,7 +196,7 @@ gameHistory conn gameId = do
 
 readJsonOptimistically :: T.Text -> Moves
 readJsonOptimistically t = case readJson t of
-                            Right v -> fromMaybe [] $ fromArray v
+                            Right v -> fromMaybe [] $ fromArrayOfMaps v
                             Left _ -> []
 
 gameTop :: R.Connection -> IO T.Text
@@ -233,7 +233,7 @@ illegalFormat = toBSL "Illegal format, i.e. got array instead of map"
 history :: R.Connection -> GameId -> IO [BS.ByteString]
 history conn gameId = R.runRedis conn $ do
     els <- R.lrange (historyKey gameId) 0 8
-    ret <- case els of 
+    ret <- case els of
             Right r -> return r
             Left _ -> return []
     return ret
@@ -263,7 +263,7 @@ currentState conn gameId playerId = R.runRedis conn $ do
 
 saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
 saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do
-    let asJson = renderJson $ asArray moves
+    let asJson = renderJson $ asArrayOfMaps moves
     let d = map lt2bs [asJson]
     _ <- R.zadd gamesKey [(fromIntegral moveNum, rawGameId gameId)]
     _ <- R.rpush (historyKey gameId) d

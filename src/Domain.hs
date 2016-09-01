@@ -16,7 +16,7 @@ data Action = Validate | Defence | Winner
 data Format = Bencode | Json | SExpr | MExpr | Scala
     deriving Show
 
-data Modifier = AsIs | NoArrays
+data Modifier = AsIs | NoArrays | NoMaps
     deriving Show
 
 type Task = (Action, Format, Modifier)
@@ -49,7 +49,7 @@ formats :: [Format]
 formats = [Bencode, Json, SExpr, MExpr, Scala]
 
 modifiers :: [Modifier]
-modifiers = [AsIs, NoArrays]
+modifiers = [AsIs, NoArrays, NoMaps]
 
 allTasks :: [Task]
 allTasks = do
@@ -70,16 +70,16 @@ data WireVal = IntVal Int |
     ListOfVals [WireVal]
     deriving (Show, Eq)
 
-asArray :: [Move] -> WireVal
-asArray moves = ListOfVals $ List.map toTriple moves
+asArrayOfMaps :: [Move] -> WireVal
+asArrayOfMaps moves = ListOfVals $ List.map toTriple moves
     where
         toValue X = ("v", StringVal "x")
         toValue O = ("v", StringVal "o")
         toTriple (Move (Coord x) (Coord y) v) =
             DictVal [("x", IntVal x), ("y", IntVal y), toValue v]
 
-fromArray :: WireVal -> Maybe [Move]
-fromArray (ListOfVals vals) = sequence $ map toMove vals
+fromArrayOfMaps :: WireVal -> Maybe [Move]
+fromArrayOfMaps (ListOfVals vals) = sequence $ map toMove vals
     where
         toMove :: WireVal -> Maybe Move
         toMove (DictVal pairs) = do
@@ -91,7 +91,7 @@ fromArray (ListOfVals vals) = sequence $ map toMove vals
         lookupX a = [ val | val <- lookupInt "x" a, val >= 0, val <= 2 ]
         lookupY a = [ val | val <- lookupInt "y" a, val >= 0, val <= 2 ]
         lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
-fromArray _ = Nothing
+fromArrayOfMaps _ = Nothing
 
 lookupInt :: T.Text -> [(T.Text, WireVal)] -> Maybe Int
 lookupInt _ [] = Nothing
@@ -110,13 +110,13 @@ boardValue "x" = Just X
 boardValue "X" = Just X
 boardValue _ = Nothing
 
-asMap :: [Move] -> WireVal
-asMap moves = DictVal $ List.zip letters vals
+asMapOfMaps :: [Move] -> WireVal
+asMapOfMaps moves = DictVal $ List.zip letters vals
     where
-        ListOfVals vals = asArray moves
+        ListOfVals vals = asArrayOfMaps moves
         letters = List.sort $ List.take (List.length moves) $
             List.map (\v -> T.pack (showHex v "")) ([0 .. ] :: [Integer])
 
-fromMap :: WireVal -> Maybe [Move]
-fromMap (DictVal pairs) = fromArray $ ListOfVals $ List.map snd $ List.sortOn fst pairs
-fromMap _ = Nothing
+fromMapOfMaps :: WireVal -> Maybe [Move]
+fromMapOfMaps (DictVal pairs) = fromArrayOfMaps $ ListOfVals $ List.map snd $ List.sortOn fst pairs
+fromMapOfMaps _ = Nothing
