@@ -24,8 +24,9 @@ tests = testGroup "TicTacToe Specification" [bencode, json, mexpr, sexpr, scala]
 
 bencode :: TestTree
 bencode = testGroup "Bencode" [
-      QC.testProperty "array of maps" $ testArrayOfMaps readBencode renderBencode
-    , QC.testProperty "map of maps" $ testMapOfMaps readBencode renderBencode
+      QC.testProperty "array of maps"    $ testArrayOfMaps   readBencode renderBencode
+    , QC.testProperty "map of maps"      $ testMapOfMaps     readBencode renderBencode
+    , QC.testProperty "arrays of arrays" $ testArrayOfArrays readBencode renderBencode
     , testCase "some list" $ readBencode "li42e4:1234e"
         @?= Right (ListOfVals [IntVal 42, StringVal "1234"])
     , testCase "some map" $ readBencode "d4:1234i42ee"
@@ -36,8 +37,9 @@ bencode = testGroup "Bencode" [
 
 json :: TestTree
 json = testGroup "Json" [
-      QC.testProperty "array of maps" $ testArrayOfMaps readJson renderJson
-    , QC.testProperty "map of maps" $ testMapOfMaps readJson renderJson
+      QC.testProperty "array of maps"    $ testArrayOfMaps   readJson renderJson
+    , QC.testProperty "map of maps"      $ testMapOfMaps     readJson renderJson
+    , QC.testProperty "arrays of arrays" $ testArrayOfArrays readJson renderJson
     , testCase "some list" $ readJson "[42, \"1234\"]"
         @?= Right (ListOfVals [IntVal 42, StringVal "1234"])
     , testCase "empty list" $ readJson "[]"
@@ -56,8 +58,9 @@ json = testGroup "Json" [
 
 mexpr :: TestTree
 mexpr = testGroup "MExpr" [
-      QC.testProperty "array of maps" $ testArrayOfMaps readMExpr renderMExpr
-    , QC.testProperty "map of maps" $ testMapOfMaps readMExpr renderMExpr
+      QC.testProperty "array of maps"    $ testArrayOfMaps   readMExpr renderMExpr
+    , QC.testProperty "map of maps"      $ testMapOfMaps     readMExpr renderMExpr
+    , QC.testProperty "arrays of arrays" $ testArrayOfArrays readMExpr renderMExpr
     , testCase "some list" $ readMExpr "l[ 42 ;\"a1234\"]"
         @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
     , testCase "empty list" $ readMExpr "l[]"
@@ -76,8 +79,9 @@ mexpr = testGroup "MExpr" [
 
 sexpr :: TestTree
 sexpr = testGroup "SExpr" [
-      QC.testProperty "array of maps" $ testArrayOfMaps readSExpr renderSExpr
-    , QC.testProperty "map of maps" $ testMapOfMaps readSExpr renderSExpr
+      QC.testProperty "array of maps"    $ testArrayOfMaps   readSExpr renderSExpr
+    , QC.testProperty "map of maps"      $ testMapOfMaps     readSExpr renderSExpr
+    , QC.testProperty "arrays of arrays" $ testArrayOfArrays readSExpr renderSExpr
     , testCase "some list" $ readSExpr "(l 42 \"a1234\")"
         @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
     , testCase "empty list" $ readSExpr "(l  )"
@@ -96,8 +100,9 @@ sexpr = testGroup "SExpr" [
 
 scala :: TestTree
 scala = testGroup "Scala" [
-      QC.testProperty "array of maps" $ testArrayOfMaps readScala renderScala
-    , QC.testProperty "map of maps" $ testMapOfMaps readScala renderScala
+      QC.testProperty "array of maps"    $ testArrayOfMaps   readScala renderScala
+    , QC.testProperty "map of maps"      $ testMapOfMaps     readScala renderScala
+    , QC.testProperty "arrays of arrays" $ testArrayOfArrays readScala renderScala
     , testCase "some list" $ readScala "List(42, a1234)"
         @?= Right (ListOfVals [IntVal 42, StringVal "a1234"])
     , testCase "empty list" $ readScala "List()"
@@ -121,6 +126,10 @@ testArrayOfMaps reader renderer moves =
 testMapOfMaps :: (T.Text -> Either T.Text WireVal) -> (WireVal -> T.Text) -> [Move] -> Bool
 testMapOfMaps reader renderer moves =
   fromJust (fromMapOfMaps (unsafe (reader (renderer (asMapOfMaps moves))))) == moves
+
+testArrayOfArrays :: (T.Text -> Either T.Text WireVal) -> (WireVal -> T.Text) -> [Move] -> Bool
+testArrayOfArrays reader renderer moves =
+  fromJust (fromArrayOfArrays (unsafe (reader (renderer (asArrayOfArrays moves))))) == moves
 
 unsafe :: Either T.Text WireVal -> WireVal
 unsafe result = case result of

@@ -69,8 +69,9 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
                 (_, h : _) -> h
                 _ -> []
         body = case modifier of
-            AsIs -> renderer $ asArrayOfMaps moves
+            AsIs     -> renderer $ asArrayOfMaps moves
             NoArrays -> renderer $ asMapOfMaps moves
+            NoMaps   -> renderer $ asArrayOfArrays moves
         dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
         dataFunction = T.concat ["message = ", TS.showtl body]

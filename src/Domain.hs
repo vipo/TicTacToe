@@ -70,6 +70,23 @@ data WireVal = IntVal Int |
     ListOfVals [WireVal]
     deriving (Show, Eq)
 
+lookupInt :: T.Text -> [(T.Text, WireVal)] -> Maybe Int
+lookupInt _ [] = Nothing
+lookupInt key ((k, IntVal i) : xs) = if key == k then (Just i) else lookupInt key xs
+lookupInt key (_ : xs) = lookupInt key xs
+
+lookupString :: T.Text -> [(T.Text, WireVal)] -> Maybe T.Text
+lookupString _ [] = Nothing
+lookupString key ((k, StringVal s) : xs) = if key == k then (Just s) else lookupString key xs
+lookupString key (_ : xs) = lookupString key xs
+
+boardValue :: T.Text -> Maybe Value
+boardValue "o" = Just O
+boardValue "O" = Just O
+boardValue "x" = Just X
+boardValue "X" = Just X
+boardValue _ = Nothing
+
 asArrayOfMaps :: [Move] -> WireVal
 asArrayOfMaps moves = ListOfVals $ List.map toTriple moves
     where
@@ -93,23 +110,6 @@ fromArrayOfMaps (ListOfVals vals) = sequence $ map toMove vals
         lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
 fromArrayOfMaps _ = Nothing
 
-lookupInt :: T.Text -> [(T.Text, WireVal)] -> Maybe Int
-lookupInt _ [] = Nothing
-lookupInt key ((k, IntVal i) : xs) = if key == k then (Just i) else lookupInt key xs
-lookupInt key (_ : xs) = lookupInt key xs
-
-lookupString :: T.Text -> [(T.Text, WireVal)] -> Maybe T.Text
-lookupString _ [] = Nothing
-lookupString key ((k, StringVal s) : xs) = if key == k then (Just s) else lookupString key xs
-lookupString key (_ : xs) = lookupString key xs
-
-boardValue :: T.Text -> Maybe Value
-boardValue "o" = Just O
-boardValue "O" = Just O
-boardValue "x" = Just X
-boardValue "X" = Just X
-boardValue _ = Nothing
-
 asMapOfMaps :: [Move] -> WireVal
 asMapOfMaps moves = DictVal $ List.zip letters vals
     where
@@ -120,3 +120,20 @@ asMapOfMaps moves = DictVal $ List.zip letters vals
 fromMapOfMaps :: WireVal -> Maybe [Move]
 fromMapOfMaps (DictVal pairs) = fromArrayOfMaps $ ListOfVals $ List.map snd $ List.sortOn fst pairs
 fromMapOfMaps _ = Nothing
+
+asArrayOfArrays :: [Move] -> WireVal
+asArrayOfArrays moves = ListOfVals $ List.map toTriple moves
+    where
+        toValue X = StringVal "x"
+        toValue O = StringVal "o"
+        toTriple (Move (Coord x) (Coord y) v) =
+            ListOfVals [StringVal "x", IntVal x, StringVal "y", IntVal y,
+                StringVal "v", toValue v]
+
+fromArrayOfArrays :: WireVal -> Maybe [Move]
+fromArrayOfArrays (ListOfVals vals) = fromArrayOfMaps $ ListOfVals $ List.map toDict vals
+    where
+        toDict (ListOfVals [StringVal k1, v1, StringVal k2, v2, StringVal k3, v3]) =
+            DictVal [(k1, v1), (k2, v2), (k3, v3)]
+        toDict _ = DictVal []
+fromArrayOfArrays _ = Nothing
