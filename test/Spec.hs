@@ -20,7 +20,14 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "TicTacToe Specification" [bencode, json, mexpr, sexpr, scala]
+tests = testGroup "TicTacToe Specification" [
+    commons, bencode, json, mexpr, sexpr, scala
+  ]
+
+commons :: TestTree
+commons = testGroup "Common properties" [
+    testCase "number of tasks" $ 45 @?= length allTasks
+  ]
 
 bencode :: TestTree
 bencode = testGroup "Bencode" [
