@@ -60,4 +60,6 @@ main = do
       unless (taskId >= 1 && taskId <= taskQuantity) next
       moves <- liftIO randomMoves
       extra <- liftIO randomMoves
-      text $ testingModule taskId moves extra
+      seed <- liftIO noiseSeed
+      let msgModifier = testingModuleNoise seed
+      text $ testingModule taskId moves extra msgModifier

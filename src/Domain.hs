@@ -64,6 +64,12 @@ idTaskMap = Map.fromList $ zip [1 .. ] allTasks
 lookupTask :: TaskId -> Maybe Task
 lookupTask taskId = Map.lookup taskId idTaskMap
 
+whitespaceNoise :: [Int] -> T.Text -> T.Text
+whitespaceNoise s t = T.pack $ concat $ map r (zip s (T.unpack t))
+    where
+        r (q, ' ') = if q > 0 then replicate q ' ' else " "
+        r (_, c) = c : []
+
 data WireVal = IntVal Int |
     StringVal T.Text |
     DictVal [(T.Text, WireVal)] |

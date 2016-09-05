@@ -49,12 +49,21 @@ randomMoves = do
 taskQuantity :: Int
 taskQuantity = L.length allTasks
 
-testingModule :: TaskId -> [Move] -> [Move] -> T.Text
+testingModule :: TaskId -> [Move] -> [Move] -> (T.Text -> T.Text) -> T.Text
 testingModule taskId = renderTask $ lookupTask taskId
 
-renderTask :: Maybe Task -> [Move] -> [Move] -> T.Text
-renderTask Nothing _ _ = ""
-renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
+noiseSeed :: IO [Int]
+noiseSeed = generate l
+    where
+        el = Q.elements [1 .. 3] :: Gen Int
+        l = Q.infiniteListOf el
+
+testingModuleNoise :: [Int] -> T.Text -> T.Text
+testingModuleNoise = whitespaceNoise
+
+renderTask :: Maybe Task -> [Move] -> [Move] -> (T.Text -> T.Text) -> T.Text
+renderTask Nothing _ _ _ = ""
+renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves noise =
     let moduleName = T.concat ["module TicTacToe.Messages.", T.pack (show format), "\nwhere\n\n"]
         renderer = case format of
             Scala -> renderScala
@@ -74,7 +83,7 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves =
             NoMaps   -> renderer $ asArrayOfArrays moves
         dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
-        dataFunction = T.concat ["message = ", TS.showtl body]
+        dataFunction = T.concat ["message = ", TS.showtl (noise body)]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
 
 thereIsWinner :: [Move] -> Bool
