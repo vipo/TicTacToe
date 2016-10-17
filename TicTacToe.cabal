@@ -42,6 +42,7 @@ executable tic-tac-toe
                      , hedis
                      , http-types
                      , QuickCheck
+                     , random-shuffle
                      , text
                      , scotty
                      , text-show
