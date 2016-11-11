@@ -86,26 +86,6 @@ renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves noise =
         dataFunction = T.concat ["message = ", TS.showtl (noise body)]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
 
-thereIsWinner :: [Move] -> Bool
-thereIsWinner [] = False
-thereIsWinner ms =
-    case movesToVal ms of
-        [a, b, c, _, _, _, _, _, _] | isJust a && a == b && b == c -> True
-        [_, _, _, a, b, c, _, _, _] | isJust a && a == b && b == c -> True
-        [_, _, _, _, _, _, a, b, c] | isJust a && a == b && b == c -> True
-        [a, _, _, b, _, _, c, _, _] | isJust a && a == b && b == c -> True
-        [_, a, _, _, b, _, _, c, _] | isJust a && a == b && b == c -> True
-        [_, _, a, _, _, b, _, _, c] | isJust a && a == b && b == c -> True
-        [a, _, _, _, b, _, _, _, c] | isJust a && a == b && b == c -> True
-        [_, _, a, _, b, _, c, _, _] | isJust a && a == b && b == c -> True
-        _ -> False
-
-movesToVal :: [Move] -> [Maybe Value]
-movesToVal ms = L.foldl toVal initial ms
-    where
-        initial = L.take 9 $ L.repeat Nothing
-        toVal acc (Move (Coord x) (Coord y) v) = acc & element (x * 3 + y) .~ Just v
-
 actionText :: Action -> T.Text
 actionText Validate = "to validate"
 actionText Defence  = "to react to"

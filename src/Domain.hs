@@ -4,9 +4,13 @@
 module Domain
 where
 
+import Control.Lens ((.~), (&), element)
+
 import qualified Data.Text.Lazy as T
 import qualified Data.Map as Map
 import qualified Data.List as List
+import Data.Maybe
+
 import Test.QuickCheck
 import Numeric
 
@@ -69,6 +73,26 @@ whitespaceNoise s t = T.pack $ concat $ map r (zip s (T.unpack t))
     where
         r (q, ' ') = if q > 0 then replicate q ' ' else " "
         r (_, c) = c : []
+
+thereIsWinner :: [Move] -> Bool
+thereIsWinner [] = False
+thereIsWinner ms =
+    case movesToVal ms of
+        [a, b, c, _, _, _, _, _, _] | isJust a && a == b && b == c -> True
+        [_, _, _, a, b, c, _, _, _] | isJust a && a == b && b == c -> True
+        [_, _, _, _, _, _, a, b, c] | isJust a && a == b && b == c -> True
+        [a, _, _, b, _, _, c, _, _] | isJust a && a == b && b == c -> True
+        [_, a, _, _, b, _, _, c, _] | isJust a && a == b && b == c -> True
+        [_, _, a, _, _, b, _, _, c] | isJust a && a == b && b == c -> True
+        [a, _, _, _, b, _, _, _, c] | isJust a && a == b && b == c -> True
+        [_, _, a, _, b, _, c, _, _] | isJust a && a == b && b == c -> True
+        _ -> False
+    where
+        movesToVal :: [Move] -> [Maybe Value]
+        movesToVal ms = List.foldl toVal initial ms
+        initial = List.take 9 $ List.repeat Nothing
+        toVal acc (Move (Coord x) (Coord y) v) = acc & element (x * 3 + y) .~ Just v
+
 
 data WireVal = IntVal Int |
     StringVal T.Text |
