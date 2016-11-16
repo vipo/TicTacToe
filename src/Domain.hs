@@ -26,8 +26,13 @@ data Modifier = AsIs | NoArrays | NoMaps
 type Task = (Action, Format, Modifier)
 type TaskId = Int
 
+class (Enum a, Bounded a, Eq a) => Circ a where
+  next :: a -> a
+  next a = if a == maxBound then minBound else succ a
+
 data Value = X | O
-    deriving (Show, Eq)
+  deriving (Enum, Show, Eq, Bounded)
+instance Circ Value
 
 type Moves = [Move]
 

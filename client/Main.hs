@@ -10,6 +10,8 @@ import Control.Monad
 import Control.Applicative
 
 import System.Environment(getArgs)
+import System.Random.Shuffle (shuffle')
+import System.Random (getStdGen)
 
 import Network.Wreq
 
@@ -70,12 +72,27 @@ move p@(gameId, playerId) continue _ =
   if not continue then return False
   else do
     board <- getBoard p
+    moves <- randomMoves
     if D.thereIsWinner board then return False
-    else (postBoard p (appendMove board) >> return True)
+    else (postBoard p (appendMove board moves) >> return True)
 
-appendMove :: [D.Move] -> [D.Move]
-appendMove [] = error "First move must be already done"
-appendMove moves = moves
+appendMove :: [D.Move] -> [(Int, Int)]-> [D.Move]
+appendMove [] _ = error "First move must be already done"
+appendMove _ [] = error "Do not know how to move"
+appendMove moves (sh@(sx,sy):st) =
+  let
+    reversed@((D.Move _ _ f):_) = reverse moves
+    reversedCoords = map (\(D.Move (D.Coord x) (D.Coord y) _) -> (x,y)) reversed
+  in
+    if sh `elem` reversedCoords
+      then appendMove moves st
+      else reverse $ (D.Move (D.Coord sx) (D.Coord sy) (D.next f)) : reversed
+
+randomMoves :: IO [(Int, Int)]
+randomMoves = do
+  let possible = [(x,y) | x <- [0,1,2], y <- [0,1,2]]
+  gen <- getStdGen
+  return $ shuffle' possible (length possible) gen
 
 urlForPlayer :: String -> String -> String
 urlForPlayer gameId playerId =
