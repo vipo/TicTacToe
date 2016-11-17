@@ -64,7 +64,7 @@ main = do
     "Game id: ", gameId,
     ", mode: ", show mode,
     ", player id: ", playerId]
-  when (mode == Attack) $ postBoard (gameId, playerId) [firstMove]
+  when (mode == Attack) $ void $ postBoard (gameId, playerId) [firstMove]
   foldM_ (move (gameId, playerId)) True [1 .. 4]
 
 move :: (String, String) -> Bool -> Int -> IO Bool
@@ -74,7 +74,8 @@ move p@(gameId, playerId) continue _ =
     board <- getBoard p
     moves <- randomMoves
     if D.thereIsWinner board then return False
-    else (postBoard p (appendMove board moves) >> return True)
+    else (postBoard p (appendMove board moves))
+          >>= (return . not . D.thereIsWinner)
 
 appendMove :: [D.Move] -> [(Int, Int)]-> [D.Move]
 appendMove [] _ = error "First move must be already done"
@@ -103,9 +104,10 @@ opts = defaults & header "Accept" .~ json & header "Content-Type" .~ json
   where
     json = ["application/json"]
 
-postBoard :: (String, String) -> [D.Move] -> IO ()
+postBoard :: (String, String) -> [D.Move] -> IO [D.Move]
 postBoard (gameId, playerId) moves =
-  void $ postWith opts (urlForPlayer gameId playerId) (A.toJSON moves)
+  postWith opts (urlForPlayer gameId playerId) (A.toJSON moves)
+    >> return moves
 
 getBoard :: (String, String) -> IO [D.Move]
 getBoard (gameId, playerId) = do
