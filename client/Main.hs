@@ -105,17 +105,17 @@ opts = defaults & header "Accept" .~ json & header "Content-Type" .~ json
     json = ["application/json"]
 
 postBoard :: (String, String) -> [D.Move] -> IO [D.Move]
-postBoard (gameId, playerId) moves =
+postBoard (gameId, playerId) moves = do
   putStrLn (concat ["POST: ", show moves])
-    >> postWith opts (urlForPlayer gameId playerId) (A.toJSON moves)
-    >> return moves
+  postWith opts (urlForPlayer gameId playerId) (A.toJSON moves)
+  return moves
 
 getBoard :: (String, String) -> IO [D.Move]
 getBoard (gameId, playerId) = do
-  r <- getWith opts (urlForPlayer gameId playerId) >>= asJSON :: IO (Response [D.Move])
-  let m = r ^. responseBody
-  putStrLn (concat ["GOT:  ", show m])
-  return m
+  r <- getWith opts (urlForPlayer gameId playerId) >>= asJSON
+  let moves = r ^. responseBody
+  putStrLn (concat [" GET: ", show moves])
+  return moves
 
 args :: [String] -> (String, Mode, String)
 args (g:a:[]) = (g, read a, a)
