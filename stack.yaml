@@ -4,3 +4,6 @@ packages:
 - './hedis'
 extra-deps: []
 resolver: lts-3.6
+nix:
+  enable: true
+  packages: [ zlib ]
