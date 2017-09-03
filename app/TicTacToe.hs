@@ -23,6 +23,8 @@ import qualified Codec.Binary.UTF8.String as UTF
 import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
 
+import Data.String.Conversions
+
 import qualified Data.Map.Strict as Map
 
 import qualified Database.Redis as R
@@ -35,6 +37,12 @@ import Test.QuickCheck as Q
 orderedValues :: [Value]
 orderedValues = L.cycle [X, O]
 
+genSafeName :: Gen String
+genSafeName =
+  let
+    gen = Q.elements $ ['a'..'z'] ++ ['A'..'Z']
+    in Q.listOf gen
+
 randomMoves :: IO [Move]
 randomMoves = do
     let allCoords = L.map  (\v -> (v `div` 3, v `mod` 3)) [0 .. 8]
@@ -42,14 +50,16 @@ randomMoves = do
     let countGen = Q.elements [0 .. 9] :: Gen Int
     count <- generate countGen
     coords <- generate coordGen
-    let pairs = L.zip orderedValues coords
-    let full = L.map (\(v, c) -> Move (Coord (fst c)) (Coord (snd c)) v) $ pairs
+    name1 <- generate genSafeName
+    name2 <- generate genSafeName
+    let pairs = L.zip3 (L.cycle [name1, name2]) orderedValues coords
+    let full = L.map (\(n, v, c) -> Move (Coord (fst c)) (Coord (snd c)) v (PlayerName n)) pairs
     return $ L.take count full
 
 taskQuantity :: Int
 taskQuantity = L.length allTasks
 
-testingModule :: TaskId -> [Move] -> [Move] -> (T.Text -> T.Text) -> T.Text
+testingModule :: TaskId -> [Move] -> T.Text
 testingModule taskId = renderTask $ lookupTask taskId
 
 noiseSeed :: IO [Int]
@@ -61,33 +71,28 @@ noiseSeed = generate l
 testingModuleNoise :: [Int] -> T.Text -> T.Text
 testingModuleNoise = whitespaceNoise
 
-renderTask :: Maybe Task -> [Move] -> [Move] -> (T.Text -> T.Text) -> T.Text
-renderTask Nothing _ _ _ = ""
-renderTask (Just (action, format, modifier)) mandatoryMoves extraMoves noise =
-    let moduleName = T.concat ["module TicTacToe.Messages.", T.pack (show format), "\nwhere\n\n"]
+renderTask :: Maybe Task -> [Move] -> T.Text
+renderTask Nothing _ = ""
+renderTask (Just (variation, action, format, modifier)) mandatoryMoves =
+    let moduleName = T.concat ["module ", cs (show variation), ".Messages.", cs (show format), "\nwhere\n\n"]
         renderer = case format of
-            Scala -> renderScala
-            SExpr -> renderSExpr
-            MExpr -> renderMExpr
             Json -> renderJson
             Bencode -> renderBencode
-        moves = case action of
-            Validate -> (L.take 8 mandatoryMoves) ++ (L.take 1 extraMoves)
-            _ -> case L.span (not . thereIsWinner) (L.inits mandatoryMoves) of
-                (a@(_ : _), []) -> L.head $ L.reverse a
-                (_, h : _) -> h
-                _ -> []
+        moves = case break thereIsWinner (L.inits mandatoryMoves) of
+                  (a@(_ : _), []) -> last a
+                  (_, h : _) -> h
+                  _ -> []
         body = case modifier of
             AsIs     -> renderer $ asArrayOfMaps moves
             NoArrays -> renderer $ asMapOfMaps moves
             NoMaps   -> renderer $ asArrayOfArrays moves
         dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
         dataSignature = "message :: String\n"
-        dataFunction = T.concat ["message = ", TS.showtl (noise body)]
+        dataFunction = T.concat ["message = ", TS.showtl body]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
 
 actionText :: Action -> T.Text
-actionText Validate = "to validate"
+--actionText Validate = "to validate"
 actionText Defence  = "to react to"
 actionText Winner = "to find out a winner"
 
@@ -103,19 +108,19 @@ printBoard moves = T.concat [
     where
         update new old = if old /= emptyCell then "#" else T.pack $ show new
         vals acc [] = acc
-        vals acc ((Move (Coord x) (Coord y) v) : t) =
+        vals acc (Move (Coord x) (Coord y) v _: t) =
             vals (acc & element coord .~ update v old) t
             where
                 coord = x * 3 + y
                 old = acc ^?! element coord
         emptyCell = " "
-        result = vals (L.take 9 (L.repeat emptyCell)) moves
+        result = vals (replicate 9 emptyCell) moves
 
 transformers :: Map.Map T.Text (
-        (T.Text -> Either T.Text WireVal),
-        (WireVal -> Maybe Moves),
-        ([Move] -> WireVal),
-        (WireVal -> T.Text))
+        T.Text -> Either T.Text WireVal,
+        WireVal -> Maybe Moves,
+        [Move] -> WireVal,
+        WireVal -> T.Text)
 transformers = Map.fromList [
           ("application/bencode",      (readBencode, fromArrayOfMaps,   asArrayOfMaps,   renderBencode))
         , ("application/json",         (readJson,    fromArrayOfMaps,   asArrayOfMaps,   renderJson))
@@ -139,7 +144,7 @@ plainText = "text/plain; charset=UTF-8"
 
 retrieveMove :: R.Connection -> Maybe T.Text -> GameId -> Player -> IO (Int, BS.ByteString, BSL.ByteString, T.Text)
 retrieveMove conn acc gameId playerId =
-    case (acc >>= (\x -> Map.lookup x transformers >>= (\t -> return (x, t)))) of
+    case acc >>= (\x -> Map.lookup x transformers >>= (\t -> return (x, t))) of
         Nothing -> return (415, toBS "Unsupported Media Type", toBSL "Unknown Accept header", plainText)
         Just (ct, (_, _, tr, ren)) -> do
             raw <- readFromChannel conn gameId playerId
@@ -151,7 +156,7 @@ retrieveMove conn acc gameId playerId =
 
 readBoardFromWire :: Maybe T.Text -> BSL.ByteString -> Either (Int, BS.ByteString, BSL.ByteString) Moves
 readBoardFromWire ct body =
-    case (ct >>= (\x -> Map.lookup x transformers)) of
+    case ct >>= (`Map.lookup` transformers) of
         Nothing -> Left (415, toBS "Unsupported Media Type", BSL.empty)
         Just (reader, ds, _, _) -> tpr reader ds body
 
@@ -167,7 +172,7 @@ tpr reader transformer bytes =
 
 data Player = Player1 | Player2
 
-data GameId = GameId ! T.Text
+newtype GameId = GameId T.Text
 
 oppositePlayer :: Player -> Player
 oppositePlayer Player1 = Player2
@@ -198,7 +203,7 @@ gameTop :: R.Connection -> IO T.Text
 gameTop conn = do
     gameIds <- lastGames conn
     let html = H.docTypeHtml $ do
-            H.head $ do
+            H.head $
                 H.title "History"
             H.body $ do
                 H.h1 "Last games"
@@ -228,10 +233,9 @@ illegalFormat = toBSL "Illegal format, i.e. got array instead of map"
 history :: R.Connection -> GameId -> IO [BS.ByteString]
 history conn gameId = R.runRedis conn $ do
     els <- R.lrange (historyKey gameId) 0 8
-    ret <- case els of
-            Right r -> return r
-            Left _ -> return []
-    return ret
+    case els of
+      Right r -> return r
+      Left _ -> return []
 
 channelKey :: GameId -> Player -> BS.ByteString
 channelKey (GameId gameId) playerId =
@@ -254,7 +258,7 @@ currentState conn gameId playerId = R.runRedis conn $ do
     len <- R.llen $ historyKey gameId
     opp <- R.llen $ channelKey gameId (oppositePlayer playerId)
     count <- R.incr counterKey
-    return $ [ (l, o, c) | l <- len, o <- opp, c <- count ]
+    return [ (l, o, c) | l <- len, o <- opp, c <- count ]
 
 saveMoves :: R.Connection -> GameId -> Player -> Moves -> Integer -> IO ()
 saveMoves conn gameId playerId moves moveNum = R.runRedis conn $ do

@@ -22,6 +22,7 @@ library
                      , either
                      , QuickCheck
                      , parsec
+                     , string-conversions
                      , text
                      , transformers
                      , lens
@@ -44,6 +45,7 @@ executable tic-tac-toe
                      , QuickCheck
                      , text
                      , scotty
+                     , string-conversions
                      , text-show
                      , transformers
                      , lens

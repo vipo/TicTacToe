@@ -7,8 +7,8 @@ let
   f = { mkDerivation, aeson, base, blaze-html, blaze-markup
       , bytestring, containers, either, hedis, http-types, lens, parsec
       , QuickCheck, random, random-shuffle, scientific, scotty, stdenv
-      , tasty, tasty-hunit, tasty-quickcheck, text, text-show
-      , transformers, utf8-string, warp, wreq
+      , string-conversions, tasty, tasty-hunit, tasty-quickcheck, text
+      , text-show, transformers, utf8-string, warp, wreq
       }:
       mkDerivation {
         pname = "TicTacToe";
@@ -22,8 +22,8 @@ let
         executableHaskellDepends = [
           aeson base blaze-html blaze-markup bytestring containers hedis
           http-types lens QuickCheck random random-shuffle scientific scotty
-          tasty tasty-hunit tasty-quickcheck text text-show transformers
-          utf8-string warp wreq
+          string-conversions tasty tasty-hunit tasty-quickcheck text
+          text-show transformers utf8-string warp wreq
         ];
         description = "Initial project template from stack";
         license = stdenv.lib.licenses.bsd3;

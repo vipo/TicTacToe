@@ -26,7 +26,7 @@ tests = testGroup "TicTacToe Specification" [
 
 commons :: TestTree
 commons = testGroup "Common properties" [
-    testCase "number of tasks" $ 45 @?= length allTasks
+    testCase "number of tasks" $ 48 @?= length allTasks
   ]
 
 bencode :: TestTree

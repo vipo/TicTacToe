@@ -11,19 +11,24 @@ import qualified Data.Map as Map
 import qualified Data.List as List
 import Data.Maybe
 
+import Data.String.Conversions
+
 import Test.QuickCheck
 import Numeric
 
-data Action = Validate | Defence | Winner
-    deriving (Show, Eq)
+data Action = Defence | Winner
+  deriving (Show, Eq)
 
-data Format = Bencode | Json | SExpr | MExpr | Scala
-    deriving Show
+data Format = Bencode | Json
+  deriving Show
+
+data GameVariation = Misere | Notakto | WildTicTacToe | WildMisere
+  deriving Show
 
 data Modifier = AsIs | NoArrays | NoMaps
     deriving Show
 
-type Task = (Action, Format, Modifier)
+type Task = (GameVariation, Action, Format, Modifier)
 type TaskId = Int
 
 class (Enum a, Bounded a, Eq a) => Circ a where
@@ -39,33 +44,43 @@ type Moves = [Move]
 instance Arbitrary Value where
     arbitrary = elements [X, O]
 
-data Coord = Coord Int
+newtype Coord = Coord Int
     deriving (Show, Eq)
 instance Arbitrary Coord where
     arbitrary = do
         v <- choose (0, 1) :: Gen Int
         return $ Coord v
 
-data Move = Move Coord Coord Value
+newtype PlayerName = PlayerName String
+  deriving (Show, Eq)
+
+instance Arbitrary PlayerName where
+  arbitrary = PlayerName <$> arbitrary
+
+data Move = Move Coord Coord Value PlayerName
     deriving (Show, Eq)
 instance Arbitrary Move where
-    arbitrary = Move <$> arbitrary <*> arbitrary <*> arbitrary
+    arbitrary = Move <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 
 actions :: [Action]
-actions = [Validate, Defence, Winner]
+actions = [Defence, Winner]
 
 formats :: [Format]
-formats = [Bencode, Json, SExpr, MExpr, Scala]
+formats = [Bencode, Json]
 
 modifiers :: [Modifier]
 modifiers = [AsIs, NoArrays, NoMaps]
 
+gameVariations :: [GameVariation]
+gameVariations = [Misere, Notakto, WildTicTacToe, WildMisere]
+
 allTasks :: [Task]
 allTasks = do
-    m <- modifiers
-    f <- formats
-    a <- actions
-    return (a, f, m)
+  m <- modifiers
+  f <- formats
+  g <- gameVariations
+  a <- actions
+  return (g, a, f, m)
 
 idTaskMap :: Map.Map TaskId Task
 idTaskMap = Map.fromList $ zip [1 .. ] allTasks
@@ -74,10 +89,10 @@ lookupTask :: TaskId -> Maybe Task
 lookupTask taskId = Map.lookup taskId idTaskMap
 
 whitespaceNoise :: [Int] -> T.Text -> T.Text
-whitespaceNoise s t = T.pack $ concat $ map r (zip s (T.unpack t))
+whitespaceNoise s t = T.pack $ concatMap r (zip s (T.unpack t))
     where
         r (q, ' ') = if q > 0 then replicate q ' ' else " "
-        r (_, c) = c : []
+        r (_, c) = [c]
 
 thereIsWinner :: [Move] -> Bool
 thereIsWinner [] = False
@@ -94,9 +109,9 @@ thereIsWinner ms =
         _ -> False
     where
         movesToVal :: [Move] -> [Maybe Value]
-        movesToVal ms = List.foldl toVal initial ms
-        initial = List.take 9 $ List.repeat Nothing
-        toVal acc (Move (Coord x) (Coord y) v) = acc & element (x * 3 + y) .~ Just v
+        movesToVal = List.foldl toVal initial
+        initial = replicate 9 Nothing
+        toVal acc (Move (Coord x) (Coord y) v _) = acc & element (x * 3 + y) .~ Just v
 
 
 data WireVal = IntVal Int |
@@ -107,12 +122,12 @@ data WireVal = IntVal Int |
 
 lookupInt :: T.Text -> [(T.Text, WireVal)] -> Maybe Int
 lookupInt _ [] = Nothing
-lookupInt key ((k, IntVal i) : xs) = if key == k then (Just i) else lookupInt key xs
+lookupInt key ((k, IntVal i) : xs) = if key == k then Just i else lookupInt key xs
 lookupInt key (_ : xs) = lookupInt key xs
 
 lookupString :: T.Text -> [(T.Text, WireVal)] -> Maybe T.Text
 lookupString _ [] = Nothing
-lookupString key ((k, StringVal s) : xs) = if key == k then (Just s) else lookupString key xs
+lookupString key ((k, StringVal s) : xs) = if key == k then Just s else lookupString key xs
 lookupString key (_ : xs) = lookupString key xs
 
 boardValue :: T.Text -> Maybe Value
@@ -127,22 +142,24 @@ asArrayOfMaps moves = ListOfVals $ List.map toTriple moves
     where
         toValue X = ("v", StringVal "x")
         toValue O = ("v", StringVal "o")
-        toTriple (Move (Coord x) (Coord y) v) =
-            DictVal [("x", IntVal x), ("y", IntVal y), toValue v]
+        toTriple (Move (Coord x) (Coord y) v (PlayerName n)) =
+            DictVal [("x", IntVal x), ("y", IntVal y), toValue v, ("id", StringVal (cs n))]
 
 fromArrayOfMaps :: WireVal -> Maybe [Move]
-fromArrayOfMaps (ListOfVals vals) = sequence $ map toMove vals
+fromArrayOfMaps (ListOfVals vals) = mapM toMove vals
     where
         toMove :: WireVal -> Maybe Move
         toMove (DictVal pairs) = do
             x <- lookupX pairs
             y <- lookupY pairs
             v <- lookupV pairs
-            return $ Move (Coord x) (Coord y) v
+            n <- lookupName pairs
+            return $ Move (Coord x) (Coord y) v (PlayerName (cs n))
         toMove _ = Nothing
         lookupX a = [ val | val <- lookupInt "x" a, val >= 0, val <= 2 ]
         lookupY a = [ val | val <- lookupInt "y" a, val >= 0, val <= 2 ]
         lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
+        lookupName = lookupString "id"
 fromArrayOfMaps _ = Nothing
 
 asMapOfMaps :: [Move] -> WireVal
@@ -161,9 +178,9 @@ asArrayOfArrays moves = ListOfVals $ List.map toTriple moves
     where
         toValue X = StringVal "x"
         toValue O = StringVal "o"
-        toTriple (Move (Coord x) (Coord y) v) =
+        toTriple (Move (Coord x) (Coord y) v (PlayerName i)) =
             ListOfVals [StringVal "x", IntVal x, StringVal "y", IntVal y,
-                StringVal "v", toValue v]
+                StringVal "v", toValue v, StringVal "id", StringVal (cs i)]
 
 fromArrayOfArrays :: WireVal -> Maybe [Move]
 fromArrayOfArrays (ListOfVals vals) = fromArrayOfMaps $ ListOfVals $ List.map toDict vals
