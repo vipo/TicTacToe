@@ -12,6 +12,7 @@ import qualified Data.List as List
 import Data.Maybe
 
 import Data.String.Conversions
+import Control.Arrow
 
 import Test.QuickCheck
 import Numeric
@@ -138,12 +139,20 @@ boardValue "X" = Just X
 boardValue _ = Nothing
 
 asArrayOfMaps :: [Move] -> WireVal
-asArrayOfMaps moves = ListOfVals $ List.map toTriple moves
-    where
-        toValue X = ("v", StringVal "x")
-        toValue O = ("v", StringVal "o")
-        toTriple (Move (Coord x) (Coord y) v (PlayerName n)) =
-            DictVal [("x", IntVal x), ("y", IntVal y), toValue v, ("id", StringVal (cs n))]
+asArrayOfMaps [] = DictVal []
+asArrayOfMaps moves =
+  let
+    toValue X = ("v", StringVal "x")
+    toValue O = ("v", StringVal "o")
+    toDict (Move (Coord x) (Coord y) v (PlayerName n)) prev =
+      let
+        p = case prev of
+          Nothing -> []
+          Just va -> [("prev", va)]
+        in DictVal $ [("c", ListOfVals [IntVal x, IntVal y]), toValue v, ("id", StringVal (cs n))] ++ p
+    appendPrev d m = toDict m (Just d)
+    (la : re) = reverse moves
+    in foldl appendPrev (toDict la Nothing) re
 
 fromArrayOfMaps :: WireVal -> Maybe [Move]
 fromArrayOfMaps (ListOfVals vals) = mapM toMove vals
@@ -163,24 +172,26 @@ fromArrayOfMaps (ListOfVals vals) = mapM toMove vals
 fromArrayOfMaps _ = Nothing
 
 asMapOfMaps :: [Move] -> WireVal
-asMapOfMaps moves = DictVal $ List.zip letters vals
+asMapOfMaps moves = asMap $ asArrayOfMaps moves
     where
-        ListOfVals vals = asArrayOfMaps moves
         letters = List.sort $ List.take (List.length moves) $
             List.map (\v -> T.pack (showHex v "")) ([0 .. ] :: [Integer])
+        asMap :: WireVal -> WireVal
+        asMap (ListOfVals v) = DictVal $ List.zip letters $ map asMap v
+        asMap (DictVal d) = DictVal $ map (Control.Arrow.second asMap) d
+        asMap v = v
 
 fromMapOfMaps :: WireVal -> Maybe [Move]
 fromMapOfMaps (DictVal pairs) = fromArrayOfMaps $ ListOfVals $ List.map snd $ List.sortOn fst pairs
 fromMapOfMaps _ = Nothing
 
 asArrayOfArrays :: [Move] -> WireVal
-asArrayOfArrays moves = ListOfVals $ List.map toTriple moves
+asArrayOfArrays moves = asArr $ asArrayOfMaps moves
     where
-        toValue X = StringVal "x"
-        toValue O = StringVal "o"
-        toTriple (Move (Coord x) (Coord y) v (PlayerName i)) =
-            ListOfVals [StringVal "x", IntVal x, StringVal "y", IntVal y,
-                StringVal "v", toValue v, StringVal "id", StringVal (cs i)]
+        asArr :: WireVal -> WireVal
+        asArr (ListOfVals v) = ListOfVals $ map asArr v
+        asArr (DictVal d) = ListOfVals $ d >>= (\(k, v) -> [StringVal k, asArr v])
+        asArr v = v
 
 fromArrayOfArrays :: WireVal -> Maybe [Move]
 fromArrayOfArrays (ListOfVals vals) = fromArrayOfMaps $ ListOfVals $ List.map toDict vals
