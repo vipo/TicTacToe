@@ -131,6 +131,12 @@ lookupString _ [] = Nothing
 lookupString key ((k, StringVal s) : xs) = if key == k then Just s else lookupString key xs
 lookupString key (_ : xs) = lookupString key xs
 
+lookupPair :: T.Text -> [(T.Text, WireVal)] -> Maybe (Int, Int)
+lookupPair k a =
+  case List.lookup k a of
+    Just (ListOfVals [IntVal v1, IntVal v2]) -> Just (v1, v2)
+    _ -> Nothing
+
 boardValue :: T.Text -> Maybe Value
 boardValue "o" = Just O
 boardValue "O" = Just O
@@ -154,20 +160,29 @@ asArrayOfMaps moves =
     (la : re) = reverse moves
     in foldl appendPrev (toDict la Nothing) re
 
+toInits :: WireVal -> [WireVal]
+toInits g@(DictVal _) = coll g []
+  where
+    coll d@(DictVal vals) acc =
+      case List.lookup "prev" vals of
+        Nothing -> d : acc
+        Just v -> coll v (d : acc)
+    coll _ acc = acc
+toInits _ = []
+
 fromArrayOfMaps :: WireVal -> Maybe [Move]
-fromArrayOfMaps (ListOfVals vals) = mapM toMove vals
+fromArrayOfMaps (DictVal []) = Just []
+fromArrayOfMaps d@(DictVal _) = fmap reverse $ mapM toMove $ toInits d
     where
         toMove :: WireVal -> Maybe Move
         toMove (DictVal pairs) = do
-            x <- lookupX pairs
-            y <- lookupY pairs
             v <- lookupV pairs
+            c <- lookupC pairs
             n <- lookupName pairs
-            return $ Move (Coord x) (Coord y) v (PlayerName (cs n))
+            return $ Move (Coord (fst c)) (Coord (snd c)) v (PlayerName (cs n))
         toMove _ = Nothing
-        lookupX a = [ val | val <- lookupInt "x" a, val >= 0, val <= 2 ]
-        lookupY a = [ val | val <- lookupInt "y" a, val >= 0, val <= 2 ]
         lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
+        lookupC a = [ (c1, c2) | (c1, c2) <- lookupPair "c" a, c1 >= 0, c1 <= 2, c2 >= 0, c2 <= 2]
         lookupName = lookupString "id"
 fromArrayOfMaps _ = Nothing
 
