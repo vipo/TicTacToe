@@ -1,21 +1,22 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Domain
 where
 
-import Control.Lens ((.~), (&), element)
+import           Control.Lens            (element, (&), (.~))
 
-import qualified Data.Text.Lazy as T
-import qualified Data.Map as Map
-import qualified Data.List as List
-import Data.Maybe
+import qualified Data.List               as List
+import qualified Data.Map                as Map
+import           Data.Maybe
+import qualified Data.Ord                as Ord
+import qualified Data.Text.Lazy          as T
 
-import Data.String.Conversions
-import Control.Arrow
+import           Control.Arrow
+import           Data.String.Conversions
 
-import Test.QuickCheck
-import Numeric
+import           Numeric
+import           Test.QuickCheck
 
 data Action = Defence | Winner
   deriving (Show, Eq)
@@ -56,7 +57,13 @@ newtype PlayerName = PlayerName String
   deriving (Show, Eq)
 
 instance Arbitrary PlayerName where
-  arbitrary = PlayerName <$> arbitrary
+  arbitrary = PlayerName <$> genSafeName
+    where
+      genSafeName :: Gen String
+      genSafeName =
+          let
+            gen = elements $ ['a'..'z'] ++ ['0'..'9'] ++ ['A'..'Z']
+            in listOf gen
 
 data Move = Move Coord Coord Value PlayerName
     deriving (Show, Eq)
@@ -93,7 +100,7 @@ whitespaceNoise :: [Int] -> T.Text -> T.Text
 whitespaceNoise s t = T.pack $ concatMap r (zip s (T.unpack t))
     where
         r (q, ' ') = if q > 0 then replicate q ' ' else " "
-        r (_, c) = [c]
+        r (_, c)   = [c]
 
 thereIsWinner :: [Move] -> Bool
 thereIsWinner [] = False
@@ -107,7 +114,7 @@ thereIsWinner ms =
         [_, _, a, _, _, b, _, _, c] | isJust a && a == b && b == c -> True
         [a, _, _, _, b, _, _, _, c] | isJust a && a == b && b == c -> True
         [_, _, a, _, b, _, c, _, _] | isJust a && a == b && b == c -> True
-        _ -> False
+        _                           -> False
     where
         movesToVal :: [Move] -> [Maybe Value]
         movesToVal = List.foldl toVal initial
@@ -135,14 +142,24 @@ lookupPair :: T.Text -> [(T.Text, WireVal)] -> Maybe (Int, Int)
 lookupPair k a =
   case List.lookup k a of
     Just (ListOfVals [IntVal v1, IntVal v2]) -> Just (v1, v2)
-    _ -> Nothing
+    _                                        -> Nothing
+
+lookupDict :: T.Text -> [(T.Text, WireVal)] -> Maybe (Int, Int)
+lookupDict k a =
+  case List.lookup k a of
+    Just (DictVal ts) -> extr $ List.sortBy (Ord.comparing fst) ts
+    _                 -> Nothing
+  where
+    extr :: [(T.Text, WireVal)] -> Maybe (Int, Int)
+    extr [(_, IntVal v1), (_, IntVal v2)] = Just (v1, v2)
+    extr _                                = Nothing
 
 boardValue :: T.Text -> Maybe Value
 boardValue "o" = Just O
 boardValue "O" = Just O
 boardValue "x" = Just X
 boardValue "X" = Just X
-boardValue _ = Nothing
+boardValue _   = Nothing
 
 asArrayOfMaps :: [Move] -> WireVal
 asArrayOfMaps [] = DictVal []
@@ -166,7 +183,7 @@ toInits g@(DictVal _) = coll g []
     coll d@(DictVal vals) acc =
       case List.lookup "prev" vals of
         Nothing -> d : acc
-        Just v -> coll v (d : acc)
+        Just v  -> coll v (d : acc)
     coll _ acc = acc
 toInits _ = []
 
@@ -189,15 +206,26 @@ fromArrayOfMaps _ = Nothing
 asMapOfMaps :: [Move] -> WireVal
 asMapOfMaps moves = asMap $ asArrayOfMaps moves
     where
-        letters = List.sort $ List.take (List.length moves) $
-            List.map (\v -> T.pack (showHex v "")) ([0 .. ] :: [Integer])
+        letters = List.map (\v -> T.pack (showHex v "")) ([0 .. ] :: [Integer])
         asMap :: WireVal -> WireVal
-        asMap (ListOfVals v) = DictVal $ List.zip letters $ map asMap v
-        asMap (DictVal d) = DictVal $ map (Control.Arrow.second asMap) d
-        asMap v = v
+        asMap (ListOfVals v) = DictVal $ List.zip (List.sort $ List.take (length v) letters) $ map asMap v
+        asMap (DictVal d)    = DictVal $ map (Control.Arrow.second asMap) d
+        asMap v              = v
 
 fromMapOfMaps :: WireVal -> Maybe [Move]
-fromMapOfMaps (DictVal pairs) = fromArrayOfMaps $ ListOfVals $ List.map snd $ List.sortOn fst pairs
+fromMapOfMaps (DictVal []) = Just []
+fromMapOfMaps d@(DictVal _) = fmap reverse $ mapM toMove $ toInits d
+    where
+        toMove :: WireVal -> Maybe Move
+        toMove (DictVal pairs) = do
+            v <- lookupV pairs
+            c <- lookupC pairs
+            n <- lookupName pairs
+            return $ Move (Coord (fst c)) (Coord (snd c)) v (PlayerName (cs n))
+        toMove _ = Nothing
+        lookupV a = [ val | v <- lookupString "v" a, val <- boardValue v]
+        lookupC a = [ (c1, c2) | (c1, c2) <- lookupDict "c" a, c1 >= 0, c1 <= 2, c2 >= 0, c2 <= 2]
+        lookupName = lookupString "id"
 fromMapOfMaps _ = Nothing
 
 asArrayOfArrays :: [Move] -> WireVal
