@@ -237,9 +237,14 @@ asArrayOfArrays moves = asArr $ asArrayOfMaps moves
         asArr v = v
 
 fromArrayOfArrays :: WireVal -> Maybe [Move]
-fromArrayOfArrays (ListOfVals vals) = fromArrayOfMaps $ ListOfVals $ List.map toDict vals
-    where
-        toDict (ListOfVals [StringVal k1, v1, StringVal k2, v2, StringVal k3, v3]) =
-            DictVal [(k1, v1), (k2, v2), (k3, v3)]
-        toDict _ = DictVal []
+fromArrayOfArrays (ListOfVals []) = Just []
+fromArrayOfArrays l@(ListOfVals _) = fromArrayOfMaps $ toDict l
+  where
+    toDict (ListOfVals [StringVal k1, v1, StringVal k2, v2, StringVal k3, v3]) =
+        DictVal [(k1, v1), (k2, v2), (k3, v3)]
+    toDict (ListOfVals [StringVal k1, v1, StringVal k2, v2, StringVal k3, v3, StringVal k4, v4]) =
+        case List.partition (\(k,_) -> k == "prev") [(k1, v1), (k2, v2), (k3, v3), (k4, v4)] of
+          ([(k, v)], ts) -> DictVal $ (k, toDict v) : ts
+          _ -> DictVal []
+    toDict _ = DictVal []
 fromArrayOfArrays _ = Nothing
