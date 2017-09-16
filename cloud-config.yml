@@ -27,7 +27,7 @@ write_files:
       }
 
       server {
-          location tictactoe.homedir.eu/ {
+          location / {
               proxy_pass http://backend;
           }
       }
