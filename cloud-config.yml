@@ -27,19 +27,9 @@ write_files:
       }
 
       server {
+          listen 80;
           location / {
               proxy_pass http://backend;
-          }
-      }
-  - path: var/docker/volumes/nginx/default.conf
-    content: |
-      server {
-          listen       80;
-          server_name  localhost;
-
-          error_page   500 502 503 504  /50x.html;
-          location = /50x.html {
-              root   /usr/share/nginx/html;
           }
       }
   - path: /etc/systemd/system/nginx.service
