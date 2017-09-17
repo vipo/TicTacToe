@@ -74,10 +74,15 @@ write_files:
       WantedBy=multi-user.target
 
 coreos:
+  update:
+    reboot-strategy: "reboot"
   units:
     - name: redis.service
       command: start
+      enable: true
     - name: tic-tac-toe.service
       command: start
+      enable: true
     - name: nginx.service
       command: start
+      enable: true
