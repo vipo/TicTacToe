@@ -1,9 +1,12 @@
 flags: {}
 packages:
 - '.'
-- './hedis'
-extra-deps: []
-resolver: lts-3.6
-nix:
+extra-deps: [ ]
+resolver: lts-9.4
+docker:
   enable: true
-  packages: [ zlib ]
+  auto-pull: true
+image:
+  container:
+    name: vipo/tic-tac-toe
+    base: vipo/stack-run

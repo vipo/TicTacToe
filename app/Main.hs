@@ -15,7 +15,7 @@ import Control.Monad.IO.Class
 import qualified Network.Wai.Handler.Warp as W
 
 opts :: Options
-opts = Options 1 (W.setHost "127.0.0.1" W.defaultSettings)
+opts = Options 1 (W.setHost "0.0.0.0" W.defaultSettings)
 
 instance Parsable Player where
     parseParam "1" = Right Player1
