@@ -46,7 +46,7 @@ write_files:
       ExecStartPre=-/usr/bin/docker kill nginx
       ExecStartPre=-/usr/bin/docker rm nginx
       ExecStartPre=/usr/bin/docker pull nginx:1.13.5
-      ExecStart=/usr/bin/docker run --name nginx -p 80:80 -v /var/docker/volumes/nginx:/etc/nginx/conf.d:ro --link tictactoe nginx:1.13.5
+      ExecStart=/usr/bin/docker run --name nginx -p 80:80 -v /var/docker/volumes/nginx:/etc/nginx/conf.d:ro --link tictactoe:tictactoe nginx:1.13.5
 
       ExecStop=/usr/bin/docker kill nginx
 
@@ -66,7 +66,7 @@ write_files:
       ExecStartPre=-/usr/bin/docker kill tictactoe
       ExecStartPre=-/usr/bin/docker rm tictactoe
       ExecStartPre=/usr/bin/docker pull vipo/tic-tac-toe:latest
-      ExecStart=/usr/bin/docker run --name tictactoe -p 3000:3000 --link redis vipo/tic-tac-toe:latest tic-tac-toe
+      ExecStart=/usr/bin/docker run --name tictactoe -p 3000:3000 --link redis:redis vipo/tic-tac-toe:latest tic-tac-toe
 
       ExecStop=/usr/bin/docker kill tictactoe
 
