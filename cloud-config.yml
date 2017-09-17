@@ -2,24 +2,6 @@
 
 write_files:
   - path: /var/docker/volumes/redis/keep
-  - path: /etc/systemd/system/redis.service
-    content: |
-      [Unit]
-      Description=Redis
-      After=docker.service
-      Requires=docker.service
-
-      [Service]
-      TimeoutStartSec=0
-      ExecStartPre=-/usr/bin/docker kill redis
-      ExecStartPre=-/usr/bin/docker rm redis
-      ExecStartPre=/usr/bin/docker pull redis:3.2-alpine
-      ExecStart=/usr/bin/docker run --name redis -v /var/docker/volumes/redis:/data redis:3.2-alpine redis-server --appendonly yes
-
-      ExecStop=/usr/bin/docker kill redis
-
-      [Install]
-      WantedBy=multi-user.target
   - path: var/docker/volumes/nginx/tictactoe.conf
     content: |
       upstream backend {
@@ -32,46 +14,6 @@ write_files:
               proxy_pass http://backend;
           }
       }
-  - path: /etc/systemd/system/nginx.service
-    content: |
-      [Unit]
-      Description=Nginx
-      After=docker.service
-      After=tic-tac-toe.service
-      Requires=docker.service
-      Requires=tic-tac-toe.service
-
-      [Service]
-      TimeoutStartSec=0
-      ExecStartPre=-/usr/bin/docker kill nginx
-      ExecStartPre=-/usr/bin/docker rm nginx
-      ExecStartPre=/usr/bin/docker pull nginx:1.13.5
-      ExecStart=/usr/bin/docker run --name nginx -p 80:80 -v /var/docker/volumes/nginx:/etc/nginx/conf.d:ro --link tictactoe:tictactoe nginx:1.13.5
-
-      ExecStop=/usr/bin/docker kill nginx
-
-      [Install]
-      WantedBy=multi-user.target
-  - path: /etc/systemd/system/tic-tac-toe.service
-    content: |
-      [Unit]
-      Description=TicTacToe
-      After=docker.service
-      After=redis.service
-      Requires=docker.service
-      Requires=redis.service
-
-      [Service]
-      TimeoutStartSec=0
-      ExecStartPre=-/usr/bin/docker kill tictactoe
-      ExecStartPre=-/usr/bin/docker rm tictactoe
-      ExecStartPre=/usr/bin/docker pull vipo/tic-tac-toe:latest
-      ExecStart=/usr/bin/docker run --name tictactoe -p 3000:3000 --link redis:redis vipo/tic-tac-toe:latest tic-tac-toe
-
-      ExecStop=/usr/bin/docker kill tictactoe
-
-      [Install]
-      WantedBy=multi-user.target
 
 coreos:
   update:
@@ -80,9 +22,64 @@ coreos:
     - name: redis.service
       command: start
       enable: true
+      content: |
+        [Unit]
+        Description=Redis
+        After=docker.service
+        Requires=docker.service
+
+        [Service]
+        TimeoutStartSec=0
+        ExecStartPre=-/usr/bin/docker kill redis
+        ExecStartPre=-/usr/bin/docker rm redis
+        ExecStartPre=/usr/bin/docker pull redis:3.2-alpine
+        ExecStart=/usr/bin/docker run --name redis -v /var/docker/volumes/redis:/data redis:3.2-alpine redis-server --appendonly yes
+
+        ExecStop=/usr/bin/docker kill redis
+
+        [Install]
+        WantedBy=multi-user.target
     - name: tic-tac-toe.service
       command: start
       enable: true
+      content: |
+        [Unit]
+        Description=TicTacToe
+        After=docker.service
+        After=redis.service
+        Requires=docker.service
+        Requires=redis.service
+
+        [Service]
+        TimeoutStartSec=0
+        ExecStartPre=-/usr/bin/docker kill tictactoe
+        ExecStartPre=-/usr/bin/docker rm tictactoe
+        ExecStartPre=/usr/bin/docker pull vipo/tic-tac-toe:latest
+        ExecStart=/usr/bin/docker run --name tictactoe -p 3000:3000 --link redis:redis vipo/tic-tac-toe:latest tic-tac-toe
+
+        ExecStop=/usr/bin/docker kill tictactoe
+
+        [Install]
+        WantedBy=multi-user.target
     - name: nginx.service
       command: start
       enable: true
+      content: |
+        [Unit]
+        Description=Nginx
+        After=docker.service
+        After=tic-tac-toe.service
+        Requires=docker.service
+        Requires=tic-tac-toe.service
+
+        [Service]
+        TimeoutStartSec=0
+        ExecStartPre=-/usr/bin/docker kill nginx
+        ExecStartPre=-/usr/bin/docker rm nginx
+        ExecStartPre=/usr/bin/docker pull nginx:1.13.5
+        ExecStart=/usr/bin/docker run --name nginx -p 80:80 -v /var/docker/volumes/nginx:/etc/nginx/conf.d:ro --link tictactoe:tictactoe nginx:1.13.5
+
+        ExecStop=/usr/bin/docker kill nginx
+
+        [Install]
+        WantedBy=multi-user.target
