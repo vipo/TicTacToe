@@ -65,8 +65,12 @@ instance Arbitrary PlayerName where
             gen = elements $ ['a'..'z'] ++ ['0'..'9'] ++ ['A'..'Z']
             in listOf gen
 
-data Move = Move Coord Coord Value PlayerName
-    deriving (Show, Eq)
+data Move = Move {
+    moveCoordX :: Coord
+  , moveCoordY :: Coord
+  , moveValue :: Value
+  , movePlayerName :: PlayerName
+} deriving (Show, Eq)
 instance Arbitrary Move where
     arbitrary = Move <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
 

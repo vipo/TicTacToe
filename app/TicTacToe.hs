@@ -71,6 +71,18 @@ noiseSeed = generate l
 testingModuleNoise :: [Int] -> T.Text -> T.Text
 testingModuleNoise = whitespaceNoise
 
+variateMoves :: GameVariation -> [Move] -> [Move]
+variateMoves Misere ms = ms
+variateMoves Notakto ms = map (\m -> m {moveValue = X}) ms
+variateMoves _ ms =
+  let
+    pivot = 4
+    beg = take pivot ms
+    end = drop pivot ms
+    in beg ++ map (\m -> m {moveValue = O}) end
+
+-- | WildTicTacToe | WildMisere
+
 renderTask :: Maybe Task -> [Move] -> T.Text
 renderTask Nothing _ = ""
 renderTask (Just (variation, action, format, modifier)) mandatoryMoves =
@@ -78,7 +90,7 @@ renderTask (Just (variation, action, format, modifier)) mandatoryMoves =
         renderer = case format of
             Json -> renderJson
             Bencode -> renderBencode
-        moves = case break thereIsWinner (L.inits mandatoryMoves) of
+        moves = case break thereIsWinner (L.inits (variateMoves variation mandatoryMoves)) of
                   (a@(_ : _), []) -> last a
                   (_, h : _) -> h
                   _ -> []
@@ -86,32 +98,38 @@ renderTask (Just (variation, action, format, modifier)) mandatoryMoves =
             AsIs     -> renderer $ asArrayOfMaps moves
             NoArrays -> renderer $ asMapOfMaps moves
             NoMaps   -> renderer $ asArrayOfArrays moves
-        dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves, "\n-}\n"]
+        dataComment = T.concat ["{-\nmessage ", actionText action, "\nboard:\n", printBoard moves,
+          "\nmoves:\n", printMoves moves,"\n-}\n"]
         dataSignature = "message :: String\n"
         dataFunction = T.concat ["message = ", TS.showtl body]
     in T.concat [moduleName, dataComment, dataSignature, dataFunction, "\n"]
 
 actionText :: Action -> T.Text
---actionText Validate = "to validate"
 actionText Defence  = "to react to"
 actionText Winner = "to find out a winner"
 
+printMoves :: [Move] -> T.Text
+printMoves ms = T.intercalate "\n" $ map (\(Move (Coord x) (Coord y) v (PlayerName n)) ->
+  T.concat ["(", cs (show x), ", ", cs (show y), ") = ", cs (show v), " by \"", cs n, "\""]) ms
+
 printBoard :: [Move] -> T.Text
 printBoard moves = T.concat [
-    "+-+-+-+\n",
-    "|", T.intercalate "|" (L.take 3 result),            "|\n",
-    "+-+-+-+\n",
-    "|", T.intercalate "|" (L.take 3 (L.drop 3 result)), "|\n",
-    "+-+-+-+\n",
-    "|", T.intercalate "|" (L.take 3 (L.drop 6 result)), "|\n",
-    "+-+-+-+"]
+    " |0|1|2|\n",
+    "-+-+-+-+x\n",
+    "0|", T.intercalate "|" (L.take 3 result),            "|\n",
+    "-+-+-+-+\n",
+    "1|", T.intercalate "|" (L.take 3 (L.drop 3 result)), "|\n",
+    "-+-+-+-+\n",
+    "2|", T.intercalate "|" (L.take 3 (L.drop 6 result)), "|\n",
+    "-+-+-+-+\n",
+    " y\n"]
     where
         update new old = if old /= emptyCell then "#" else T.pack $ show new
         vals acc [] = acc
         vals acc (Move (Coord x) (Coord y) v _: t) =
             vals (acc & element coord .~ update v old) t
             where
-                coord = x * 3 + y
+                coord = y * 3 + x
                 old = acc ^?! element coord
         emptyCell = " "
         result = vals (replicate 9 emptyCell) moves
