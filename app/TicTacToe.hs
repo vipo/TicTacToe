@@ -59,38 +59,36 @@ randomMoves = do
 taskQuantity :: Int
 taskQuantity = L.length allTasks
 
-testingModule :: TaskId -> [Move] -> T.Text
+testingModule :: TaskId -> [Move] -> [Move] -> T.Text
 testingModule taskId = renderTask $ lookupTask taskId
 
-noiseSeed :: IO [Int]
-noiseSeed = generate l
-    where
-        el = Q.elements [1 .. 3] :: Gen Int
-        l = Q.infiniteListOf el
+addExtra :: [Move] -> [Move] -> [Move]
+addExtra [] _ = []
+addExtra m e =
+  let
+    res = m ++ take 1 (drop (length m) e)
+    names = L.cycle $ map movePlayerName $ take 2 m
+    in map (\(r,n) -> r {movePlayerName = n}) $ zip res names
 
-testingModuleNoise :: [Int] -> T.Text -> T.Text
-testingModuleNoise = whitespaceNoise
-
-variateMoves :: GameVariation -> [Move] -> [Move]
-variateMoves Misere ms = ms
-variateMoves Notakto ms = map (\m -> m {moveValue = X}) ms
-variateMoves _ ms =
+variateMoves :: GameVariation -> [Move] -> [Move]-> [Move]
+variateMoves Misere ms es = addExtra ms es
+variateMoves Notakto ms es = map (\m -> m {moveValue = X}) $ addExtra ms es
+variateMoves _ ms es =
   let
     pivot = 4
-    beg = take pivot ms
-    end = drop pivot ms
+    moves = addExtra ms es
+    beg = take pivot moves
+    end = drop pivot moves
     in beg ++ map (\m -> m {moveValue = O}) end
 
--- | WildTicTacToe | WildMisere
-
-renderTask :: Maybe Task -> [Move] -> T.Text
-renderTask Nothing _ = ""
-renderTask (Just (variation, action, format, modifier)) mandatoryMoves =
+renderTask :: Maybe Task -> [Move] -> [Move] -> T.Text
+renderTask Nothing _ _ = ""
+renderTask (Just (variation, action, format, modifier)) mandatoryMoves extraMoves =
     let moduleName = T.concat ["module ", cs (show variation), ".Messages.", cs (show format), "\nwhere\n\n"]
         renderer = case format of
             Json -> renderJson
             Bencode -> renderBencode
-        moves = case break thereIsWinner (L.inits (variateMoves variation mandatoryMoves)) of
+        moves = case break thereIsWinner (L.inits (variateMoves variation mandatoryMoves extraMoves)) of
                   (a@(_ : _), []) -> last a
                   (_, h : _) -> h
                   _ -> []

@@ -32,4 +32,5 @@ main =
       taskId <- param "id"
       unless (taskId >= 1 && taskId <= taskQuantity) next
       moves <- liftIO randomMoves
-      text $ testingModule taskId moves
+      extra <- liftIO randomMoves
+      text $ testingModule taskId moves extra
