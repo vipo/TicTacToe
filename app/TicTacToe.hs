@@ -140,19 +140,10 @@ transformers :: Map.Map T.Text (
 transformers = Map.fromList [
           ("application/bencode",      (readBencode, fromArrayOfMaps,   asArrayOfMaps,   renderBencode))
         , ("application/json",         (readJson,    fromArrayOfMaps,   asArrayOfMaps,   renderJson))
-        , ("application/s-expr",       (readSExpr,   fromArrayOfMaps,   asArrayOfMaps,   renderSExpr))
-        , ("application/m-expr",       (readMExpr,   fromArrayOfMaps,   asArrayOfMaps,   renderMExpr))
-        , ("application/scala",        (readScala,   fromArrayOfMaps,   asArrayOfMaps,   renderScala))
         , ("application/bencode+list", (readBencode, fromArrayOfArrays, asArrayOfArrays, renderBencode))
         , ("application/json+list",    (readJson,    fromArrayOfArrays, asArrayOfArrays, renderJson))
-        , ("application/s-expr+list",  (readSExpr,   fromArrayOfArrays, asArrayOfArrays, renderSExpr))
-        , ("application/m-expr+list",  (readMExpr,   fromArrayOfArrays, asArrayOfArrays, renderMExpr))
-        , ("application/scala+list",   (readScala,   fromArrayOfArrays, asArrayOfArrays, renderScala))
         , ("application/bencode+map",  (readBencode, fromMapOfMaps,     asMapOfMaps,     renderBencode))
         , ("application/json+map",     (readJson,    fromMapOfMaps,     asMapOfMaps,     renderJson))
-        , ("application/s-expr+map",   (readSExpr,   fromMapOfMaps,     asMapOfMaps,     renderSExpr))
-        , ("application/m-expr+map",   (readMExpr,   fromMapOfMaps,     asMapOfMaps,     renderMExpr))
-        , ("application/scala+map",    (readScala,   fromMapOfMaps,     asMapOfMaps,     renderScala))
     ]
 
 plainText :: T.Text
